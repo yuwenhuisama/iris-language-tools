@@ -1,0 +1,15 @@
+[
+  "class", "module", "contract", "open",
+  "extends", "for", "mixin", "where",
+  "meta", "deny", "public", "protected",
+  "private", "override", "impl", "property",
+  "shared", "key", "async", "await",
+  "fun", "let", "mut", "const",
+  "global", "import", "from", "as",
+  "export", "type", "if", "else",
+  "while", "in", "break", "continue",
+  "match", "try", "catch", "finally",
+  "raise", "return", "is", "nil",
+  "true", "false", "self", "super",
+  "typeof", "yield"
+]
