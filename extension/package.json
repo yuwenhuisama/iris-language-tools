@@ -1,0 +1,40 @@
+{
+  "name": "iris-language-tools",
+  "displayName": "Iris Language Tools",
+  "description": "Local Iris v1 lexical diagnostics, keyword completion and VM runner.",
+  "version": "0.1.0",
+  "private": true,
+  "publisher": "iris-local",
+  "engines": { "vscode": "^1.82.0", "node": ">=20" },
+  "categories": ["Programming Languages"],
+  "main": "./dist/extension.cjs",
+  "activationEvents": ["onLanguage:iris"],
+  "capabilities": { "untrustedWorkspaces": { "supported": false } },
+  "contributes": {
+    "languages": [{ "id": "iris", "aliases": ["Iris", "iris"], "extensions": [".iris"], "configuration": "./language-configuration.json" }],
+    "grammars": [{ "language": "iris", "scopeName": "source.iris", "path": "./syntaxes/iris.tmLanguage.json" }],
+    "commands": [{ "command": "iris.runFile", "title": "Iris: Run File on VM", "enablement": "isWorkspaceTrusted && editorLangId == iris && resourceScheme == file" }],
+    "configuration": {
+      "title": "Iris",
+      "properties": {
+        "iris.serverPath": { "type": "string", "default": "iris-lsp", "scope": "machine", "description": "Language server executable (absolute path or PATH command). Reload Window after changing." },
+        "iris.executablePath": { "type": "string", "default": "iris", "scope": "machine", "description": "Iris CLI executable (absolute path or PATH command)." }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc --noEmit && esbuild src/extension.ts --bundle --platform=node --format=cjs --external:vscode --outfile=dist/extension.cjs --sourcemap",
+    "test": "npm run compile && node --test test/*.test.cjs",
+    "test:integration": "npm run compile && node test/run-integration.cjs"
+  },
+  "dependencies": { "vscode-languageclient": "9.0.1" },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "1.82.0",
+    "@vscode/test-electron": "^2.5.2",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.9.0",
+    "vscode-oniguruma": "^2.0.1",
+    "vscode-textmate": "^9.2.0"
+  }
+}

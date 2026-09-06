@@ -1,0 +1,36 @@
+{
+  "name": "Iris",
+  "scopeName": "source.iris",
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#strings" },
+    { "name": "keyword.control.iris", "match": "(?<![\\p{L}\\p{N}\\p{M}_])(?:class|module|contract|open|extends|for|mixin|where|meta|deny|public|protected|private|override|impl|property|shared|key|async|await|fun|let|mut|const|global|import|from|as|export|type|if|else|while|in|break|continue|match|try|catch|finally|raise|return|is|nil|true|false|self|super|typeof|yield)(?![\\p{L}\\p{N}\\p{M}_])" },
+    { "name": "constant.numeric.iris", "match": "(?<![\\p{L}\\p{N}_])(?:0[xX][0-9a-fA-F_]+(?:\\.[0-9a-fA-F_]*)?(?:[pP][+-]?[0-9_]+)?|0[bB][01_]+|0[oO][0-7_]+|(?:[0-9][0-9_]*(?:\\.(?!\\.)[0-9_]*)?|\\.[0-9][0-9_]*)(?:[eE][+-]?[0-9_]+)?)(?:f32|f64)?" },
+    { "name": "variable.other.iris", "match": "(?:@@?|\\$)[\\p{L}_][\\p{L}\\p{N}\\p{M}_]*" },
+    { "name": "keyword.operator.iris", "match": "\\.\\.[=<]?|<=>|=>|[+*/=<>!&|^~?:-]+|%\\{" },
+    { "name": "punctuation.section.iris", "match": "[(){}\\[\\],;.]" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        { "name": "comment.line.shebang.iris", "match": "\\A#!.*$" },
+        { "name": "comment.line.double-slash.iris", "match": "//.*$" },
+        { "include": "#block-comment" }
+      ]
+    },
+    "block-comment": {
+      "name": "comment.block.iris", "begin": "/\\*", "end": "\\*/",
+      "patterns": [{ "include": "#block-comment" }]
+    },
+    "strings": {
+      "patterns": [
+        { "name": "string.quoted.raw.iris", "begin": "(?<![\\p{L}\\p{N}_])(?:mbr|mr|br|r)(#+)(\"|')", "end": "\\2\\1" },
+        { "name": "string.quoted.raw.iris", "begin": "(?<![\\p{L}\\p{N}_])(?:mbr|mr|br|r)(\"\"\"|'''|\"|')", "end": "\\1" },
+        { "name": "string.quoted.triple.iris", "begin": "(?:mb|m|b)?(\"\"\"|''')", "end": "\\1", "patterns": [{ "include": "#escape" }] },
+        { "name": "string.quoted.double.iris", "begin": "(?:mb|m|b)?\"", "end": "\"|$", "patterns": [{ "include": "#escape" }] },
+        { "name": "string.quoted.single.iris", "begin": "(?:mb|m|b)?'", "end": "'|$", "patterns": [{ "include": "#escape" }] }
+      ]
+    },
+    "escape": { "name": "constant.character.escape.iris", "match": "\\\\(?:u\\{[0-9a-fA-F]+\\}|x[0-9a-fA-F]{2}|.)" }
+  }
+}
