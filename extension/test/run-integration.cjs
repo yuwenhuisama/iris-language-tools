@@ -31,7 +31,13 @@ async function main() {
       vscodeExecutablePath: executable,
       extensionDevelopmentPath: path.resolve(__dirname, '..'),
       extensionTestsPath: path.join(__dirname, 'integration.cjs'),
-      launchArgs: [workspace, '--user-data-dir', user, '--extensions-dir', path.join(root, 'extensions'), '--disable-workspace-trust', '--skip-welcome', '--skip-release-notes'],
+      extensionTestsEnv: {
+        IRIS_EDITING_HOST: '1',
+        IRIS_EDITING_ENTER: process.env.IRIS_EDITING_ENTER ?? '',
+        IRIS_TEST_EMPTY: process.env.IRIS_TEST_EMPTY ?? '',
+        IRIS_TEST_EXECUTABLE: process.env.IRIS_TEST_EXECUTABLE ?? '',
+      },
+      launchArgs: [...(process.env.IRIS_TEST_EMPTY === '1' ? [] : [workspace]), '--user-data-dir', user, '--extensions-dir', path.join(root, 'extensions'), '--disable-workspace-trust', '--skip-welcome', '--skip-release-notes'],
     });
   } finally {
     await fs.rm(root, { recursive: true, force: true });
