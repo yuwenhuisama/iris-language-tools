@@ -25,8 +25,11 @@ window, set these user settings to your actual absolute paths:
 ```
 
 Reload Window after changing the server path. Open a `.iris` file in a trusted
-workspace. Both files and untitled Iris buffers receive lexical diagnostics
-and keyword completion. The Output panel's `Iris Language Server` channel shows
+workspace. Both files and untitled Iris buffers receive lexical diagnostics,
+definitions, references, symbol/member completion and type inlay hints. Standard
+VS Code navigation and completion commands work without custom click handlers.
+Type hints are enabled for Iris by default and can be changed with
+`editor.inlayHints.enabled`. The Output panel's `Iris Language Server` channel shows
 startup errors and lexical errors whose source position is unavailable.
 
 Use `Iris: Run File on VM` from the command palette for a saved local Iris file.
@@ -96,8 +99,15 @@ running the same npm command. The tests never rebuild the original Iris project.
 
 ## Limitations
 
-The server is lexical-only: no parser diagnostics, member completion, navigation,
-rename or debugger. Keyword suggestions are not context-sensitive.
+Semantic queries use current unsaved buffers. Cross-file queries use sources
+selected by `iris.toml` within the same manifest group; source and manifest file
+changes refresh the index. Standalone buffers remain isolated. Known receiver
+types provide member completion, including incomplete trailing-dot edits.
+Omitted named-method parameter and return annotations display `Dynamic<Object>`;
+local types are inferred conservatively, and explicit annotations get no redundant
+hints. External packages and uncertain composed member surfaces remain unsupported.
+There are no parser diagnostics, rename or debugger features. Keywords are
+suppressed in protected text and member/namespace completion contexts.
 TextMate highlights keywords, comments, numbers, strings and operators; it does
 not parse interpolation expressions or disambiguate contextual Regex versus
 division. Raw/triple string highlighting is approximate, not a lexer validator.
