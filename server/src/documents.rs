@@ -63,6 +63,10 @@ impl Documents {
         self.0.get(uri)
     }
 
+    pub(crate) fn iter(&self) -> impl ExactSizeIterator<Item = (&Uri, &Document)> {
+        self.0.iter()
+    }
+
     pub(crate) fn close(&mut self, uri: &Uri) -> Option<Document> {
         self.0.remove(uri)
     }

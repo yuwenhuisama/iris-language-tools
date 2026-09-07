@@ -7,9 +7,13 @@ mod formatting;
 mod formatting_tests;
 mod notifications;
 mod positions;
+mod semantic_query;
+mod semantic_worker;
+mod semantics;
 mod session;
 mod worker;
 mod worker_protocol;
+mod workspace;
 
 use std::process::ExitCode;
 
