@@ -1,5 +1,79 @@
 # Local MVP Verification
 
+## Hover Milestone
+
+Hover implementation passed its scoped final gate. It reuses resolved occurrences,
+shows body-free source signatures and conservative type labels, and returns the
+request document's exact UTF-16 occurrence range. Unknown, ambiguous and protected
+positions return no Hover. Documentation comments are not displayed because the
+source graph does not carry reliable attachment metadata.
+
+- Full locked/offline serial Rust workspace tests passed after Hover integration:
+  328 tests (77 analysis, 105 formatter, 146 server).
+- Workspace all-target build, strict Clippy and package formatting check passed.
+- The public `iris-analysis` Hover example passed its signature and boundary checks.
+- The initial real-editor test reached Hover successfully but incorrectly matched
+  unescaped signature text against raw Markdown. The adapter now decodes Markdown
+  punctuation escapes for display-equivalent assertions without changing server
+  escaping or range checks. The parent reran real editor integration successfully:
+  local Integer/String changes, method signatures, unknown-member refusal and
+  dirty cross-file updates all passed with exact caller occurrence ranges.
+- Parent reruns of normal and empty editor integration passed. All seven cached
+  startup hosts also passed with Hover enabled, including both suffixes, missing
+  executable recovery, interruption, timeout and deactivation/late-transport checks.
+- Oracle returned APPROVE with high confidence for the documented static scope.
+  It independently passed 23 analysis Hover tests, nine renderer/coordinator tests,
+  15 real-stdio Hover tests and the public API example. Physical mouse gestures,
+  screenshot appearance and Windows execution were not separately verified;
+  real VS Code provider commands exercised the feature on macOS.
+
+## Suffix And Startup Repair
+
+The user's Windows trace showed a successful initialize handshake advertising
+only keyword completion, with no formatting or semantic navigation capabilities.
+Their subsequent build failed on missing `iris_parser::source`, `parse_editor`,
+and `Token.end`, identifying an outdated sibling frontend checkout. This explains
+the absent providers; it does not establish support for dynamic/external members
+in their HTTP demo. The user subsequently reported recovery; this is user-supplied
+Windows evidence, not a locally observed Windows run.
+
+Current local verification on macOS with cached VS Code 1.136.1:
+
+- `cargo test --workspace --locked --offline -- --test-threads=1`: 281 pass
+  (54 analysis, 105 formatter, 122 server).
+- `npm test`: 83 pass, including TypeScript checking and bundling.
+- `cargo clippy --workspace --all-targets --locked --offline -- -D warnings`: pass.
+- `npm run test:startup`: five fresh editor hosts passed, using no downloads and
+  no forced language mode or explicit extension activation. Opening an actual
+  `.ir` file registers all five providers; exact references and member completion
+  work, and nonempty formatting edits apply. `.iris` remains supported.
+- The second host starts with a nonexistent executable. Correcting User settings
+  and invoking `iris.restartLanguageServer` restores providers without reloading.
+- Mixed-suffix real-stdio tests cover both manifest directions, disk changes,
+  unsaved overlays, and bounded inventory error details without source contents.
+- Normal and empty-workspace `test:integration` runs passed after the startup
+  changes, preserving semantic queries, formatting, snippets and the run guard.
+  Optional VM-equivalence scenarios were explicitly skipped because no CLI path
+  was supplied; no new runtime-execution result is claimed.
+
+Normal startup and missing capabilities are now logged. Restart serialization,
+cleanup failures, deactivation races and trust refusal have boundary tests.
+Restricted Mode was not exercised in a real host; trust checks remain unchanged.
+F5 now builds the known development server before compiling the extension, but
+does not override the configured command. The first gate rejected an unbounded
+initialize wait: a launched server that never replies blocks restart and delays
+deactivation cleanup indefinitely. The fix adds a 45-second initialization limit
+and interruptible retirement with owned child-process cleanup. Real nonresponding
+children were retired on timeout, restart and deactivation; corrected restarts
+restored definitions. Two installed-languageclient transport probes verified
+that late initialize responses and initialized writes register no stale providers.
+These new executable fixtures require POSIX and have not been run on Windows.
+The focused Oracle re-review returned APPROVE with high confidence against
+vscode-languageclient 9.0.1. It independently passed all 83 extension tests,
+all five cached VS Code startup hosts, and both late-response/write probes.
+No unresolved blocker remains from the startup review; the approval does not
+extend the platform coverage beyond the local macOS/POSIX evidence above.
+
 ## Semantic Editor Milestone
 
 The following evidence covers the uncommitted semantic-editor implementation.

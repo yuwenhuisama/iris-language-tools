@@ -8,13 +8,14 @@ reserved for Content-Length-framed JSON-RPC; startup failures use stderr.
 
 - Initialize/initialized, shutdown/exit, UTF-16 positions, full document sync.
 - In-memory `file:` and `untitled:` documents over a read-only package inventory.
+- `.ir` and `.iris` buffers use the same semantic and formatting providers.
 - Newer versions replace text; equal/stale versions and changes to closed
   documents are ignored. Ranged edits are rejected without mutating text.
 - Keyword completion uses the shared `language/keywords.json` at build time.
 - Lexer-only diagnostics on open/change; empty publication on fix or close.
 - Document formatting through `iris-formatter`, using current unsaved text.
 - Parsing runs in a dedicated semantic thread or formatting child, never in the main loop.
-- Static definition, references, completion, and type inlay hints through `iris-analysis`.
+- Static hover, definition, references, completion, and type inlay hints through `iris-analysis`.
 - No evaluation, dependency fetching, builds, or user code execution.
 - Full-document official-style formatting via `iris-formatter`, using the latest
   synchronized buffer and a UTF-16 full-document edit. Unchanged, unknown, closed
@@ -24,7 +25,7 @@ reserved for Content-Length-framed JSON-RPC; startup failures use stderr.
 ## Semantic Queries
 
 The server advertises definition (`F12` / `Ctrl+Click`), references (`Shift+F12`),
-completion, and type inlay hints at initialization.
+hover, completion, and type inlay hints at initialization.
 
 A dedicated semantic worker thread handles at most 32 outstanding requests.
 Input and result channels are bounded. Immutable workspace and parsed analysis
@@ -35,7 +36,8 @@ before replying. Stale requests return `-32801`. Cancellation returns `-32800`
 once.
 
 The server captures `workspaceFolders` or `rootUri` at initialization. The worker
-discovers `iris.toml` manifests and reads their explicit source lists. Filesystem
+discovers `iris.toml` manifests and reads their explicit source lists without a
+source-suffix whitelist. Mixed `.ir`/`.iris` packages are supported. Filesystem
 reads are strictly read-only. The server never writes to the workspace filesystem.
 Open buffers act as overlays and override disk contents, including unsaved edits.
 Package ID combined with API major defines a same-package resolution group. Standalone
@@ -50,11 +52,30 @@ Workspace limits guard resource consumption:
 
 When workspace inventory is incomplete or limits are exceeded, references return an
 explicit JSON-RPC error `-32803` with a structured `semantic.failed` log message.
-This prevents misleading, partially missing reference results. Completion marks
-`isIncomplete: true` when inventory is partial.
+Inventory failures include `error.data.inventory` and the same `inventory` object
+in that log: `totalCount` counts all inventory issues; `issues` contains at most
+eight entries with `kind`, available `path`/`uri` (otherwise null), and `ioKind`
+for I/O failures (for example `NotFound` for a missing listed source). No source
+contents are included. These details also accompany other semantic queries that
+fail because the requested source has an inventory issue; unrelated worker or
+query failures do not include inventory details. This prevents misleading,
+partially missing reference results. Completion on available sources marks
+`isIncomplete: true` when inventory is partial; it does not return reference results.
 
 ### Feature Behavior
 
+- **Hover**: Displays a statically resolved declaration signature and useful nonduplicate
+  type information. The exact UTF-16 range covers the hovered name in the requested
+  document, including for same-package cross-file targets. Unknown sources, unresolved
+  symbols, and unsafe syntax return `null`; requested-source inventory failures retain
+  their existing errors. Unsaved source and target edits invalidate cached results.
+  The first client-preferred Markdown/plaintext format is selected; absent or empty
+  preferences default to plaintext. Plaintext preserves the analysis signature's spacing
+  and line breaks. Markdown escapes source punctuation, including backticks, links and
+  HTML, without trusted markup or commands. No documentation is synthesized. Analysis
+  text is bounded to 4 KiB upstream; rendering is incrementally bounded to 8 KiB of
+  UTF-8, including Markdown escapes, with an ellipsis if truncated. Hover uses the
+  same worker queue, epoch checks, and cancellation path as other semantic queries.
 - **Definition (`F12` / `Ctrl+Click`)**: Resolves symbols by snapshot declaration
   identity. Returns exact UTF-16 `Location[]` target ranges. Declaration spans
   separate the full declaration from the target name span. Unknown symbols return `[]`.
@@ -99,10 +120,11 @@ otherwise it is detached. No semantic child process is spawned per keystroke.
   and external package cross-references are not resolved in this layer.
 - **Diagnostics**: Real-time editor diagnostics remain strictly lexer-only scanner
   findings. Parser errors do not produce diagnostic squiggles in the UI.
-- **File watching**: The extension watches `.iris` and `iris.toml` files and sends
-  `workspace/didChangeWatchedFiles`. Disk source edits and manifest membership
-  changes are covered by real editor integration tests. Workspace-folder changes
-  also invalidate the semantic snapshot.
+- **File watching**: Nonempty `workspace/didChangeWatchedFiles` notifications
+  invalidate the semantic snapshot without filtering suffixes. Protocol tests
+  cover disk target edits in both directions of mixed `.ir`/`.iris` packages and
+  unsaved target overlays. Clients must register and send the notifications;
+  workspace-folder changes also invalidate the semantic snapshot.
 - **Built-in members**: Completion covers source-defined symbols and known
   source-defined members. Built-in Integer/String member surfaces are not indexed.
 

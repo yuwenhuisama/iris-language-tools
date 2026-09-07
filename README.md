@@ -38,9 +38,10 @@ historical Notepad++ highlighting are not the v1 grammar authority.
 - Static semantic navigation: Go to Definition (`F12` / `Ctrl+Click`) and Find References (`Shift+F12`).
 - Smart completion for variables, parameters, constants, source classes, modules, contracts, type aliases, and known typed members alongside keywords.
 - Type inlay hints showing local variable types, literal types, and explicit method return annotations.
+- Hover showing resolved source declarations, method signatures and known types at the current cursor.
 - Same-package cross-file resolution using manifest source lists from `iris.toml`.
 - Official-style document formatting through a bounded, isolated LSP worker.
-- VS Code `.iris` registration, TextMate syntax highlighting, Enter/indentation rules, and eight snippets.
+- VS Code `.iris` and `.ir` registration, TextMate syntax highlighting, Enter/indentation rules, and eight snippets. Both suffixes use v1 syntax, not the archived legacy grammar.
 - Explicit Iris CLI `--vm` run command for trusted workspaces.
 
 ### Static Semantic Support
@@ -51,6 +52,7 @@ Static queries run in a dedicated background worker thread over immutable analys
 - **References (`Shift+F12`)**: Finds statically resolved symbol references across the package resolution group. References are static symbol bindings, not all possible dynamic runtime call targets.
 - **Completion**: Offers in-scope identifiers, known member access, and keywords. Keywords are suppressed inside member dots, namespace qualifiers, string literals, and comments. Incomplete recovery regions retain replacement spans.
 - **Inlay Hints**: Shows local inferred types for unannotated bindings and literals. Omitted method parameter and return annotations remain `Dynamic<Object>` under `TYPES-C003`; method bodies do not create inferred signature hints.
+- **Hover**: Mouse over a resolved variable, parameter, method or type name to see its declaration/signature and available type information. Results follow unsaved buffers and same-package targets. Unknown or ambiguous symbols produce no card. Documentation comments are not attached or displayed; Signature Help is separate and not implemented.
 - **Workspace Packages**: Discovers `iris.toml` manifests and tracks explicit `sources` lists. Open unsaved editor buffers serve as overlays that take precedence over disk. Standalone files and conflicting package declarations remain safely isolated. The server reads manifest sources when needed and never writes to disk.
 
 ### Boundaries and Limitations
@@ -59,7 +61,7 @@ Static queries run in a dedicated background worker thread over immutable analys
 - **Parser recovery scope**: Recovery in `iris-parser` preserves usable declarations across trailing EOF block braces and incomplete dot receivers (`receiver.`). Partial namespace identifiers (`Namespace::Prefix`) resolve, but bare trailing namespace separators (`Namespace::`) without an identifier production are suppressed.
 - **Conservative resolution**: Inherited members, mixin composition, contract views, generic type substitution, re-export facades, dynamic monkey patching, and external package imports are not synthesized or guessed.
 - **Diagnostics**: Real-time editor diagnostics remain lexer-only scanner errors. Parser syntax errors do not emit squiggles in the editor.
-- **File watching**: Protocol support for watched file changes is present on the server, while extension client file watchers are still in progress. Saving buffers or modifying workspace folders reloads the workspace snapshot.
+- **File watching**: The extension watches `.iris`, `.ir`, and `iris.toml`; source and manifest changes invalidate workspace snapshots.
 - **Tooling in progress**: Rename, semantic token highlighting, and interactive debugging are not yet implemented.
 
 ```toml
@@ -119,12 +121,24 @@ Building the language server depends directly on the sibling `Iris-Language` par
 syntax, and lexer crates. When updating either checkout, rebuild the server to ensure
 binary compatibility with the companion frontend:
 
+Use the sibling language repository's `new-iris-dev` branch containing `f260d5f`
+or a descendant. Missing `iris_parser::source`, `parse_editor`, or `Token.end`
+during compilation means that checkout is too old. Cargo path dependencies read
+local source; `--locked` does not update the sibling Git checkout. A failed build
+can leave an older executable on disk.
+
 ```sh
 cargo build -p iris-lsp
 ```
 
 Rebuild the companion `iris` CLI in `Iris-Language` as well if you use VM run commands
 or formatted output that relies on updated grammar rules.
+
+Set the User `iris.serverPath` to the newly built executable, then run
+**Iris: Restart Language Server**. Output now records the command and negotiated
+capabilities. A server advertising only `completionProvider` is an older feature
+set, even if its version still reads `0.1.0`. Missing providers are different from
+a supported provider returning no static matches or refusing an unsafe format.
 
 ## Build and Test
 

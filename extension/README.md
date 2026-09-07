@@ -14,8 +14,11 @@ Build the server first with `cargo build -p iris-lsp` from the repository root.
 The integration command downloads an isolated VS Code via the official test
 runner; it does not install the extension in your normal editor profile.
 
-Open this `extension` directory in VS Code and press F5. In the development
-window, set these user settings to your actual absolute paths:
+Open this `extension` directory in VS Code and press F5. The prelaunch tasks build
+`iris-lsp` from the tools repository root with `cargo build --offline -p iris-lsp`,
+then compile the extension. Cargo must be on VS Code's PATH and the Rust dependencies
+must already be cached. The tasks do not change your selected server executable.
+In the development window, set these user settings to your actual absolute paths:
 
 ```json
 {
@@ -24,13 +27,36 @@ window, set these user settings to your actual absolute paths:
 }
 ```
 
-Reload Window after changing the server path. Open a `.iris` file in a trusted
-workspace. Both files and untitled Iris buffers receive lexical diagnostics,
-definitions, references, symbol/member completion and type inlay hints. Standard
-VS Code navigation and completion commands work without custom click handlers.
+Run **Iris: Restart Language Server** after changing the server path. Open a `.ir`
+or `.iris` file in a trusted workspace to activate automatically. Both suffixes use
+the same Iris v1 grammar; `.ir` does not enable archived legacy syntax.
+Both files and untitled Iris buffers receive lexical diagnostics,
+definitions, references, hover, symbol/member completion and type inlay hints. Standard
+VS Code navigation, hover and completion work through the language client without
+custom providers or click handlers. Hover a statically resolved symbol to see its
+type or source method signature at the selected occurrence. Hover uses current
+unsaved source, including dirty same-package targets; unknown members return no
+hover rather than a guessed signature. Documentation comments are not attached to
+analysis metadata yet, so hover does not include documentation text.
 Type hints are enabled for Iris by default and can be changed with
 `editor.inlayHints.enabled`. The Output panel's `Iris Language Server` channel shows
-startup errors and lexical errors whose source position is unavailable.
+the selected startup command, initialized server name/version and availability of
+formatting, definition, references, completion, inlay hints and hover, plus startup errors
+and lexical errors whose source position is unavailable. Startup logging does not
+include source text. If a server omits an expected capability, a warning suggests
+checking for a stale or wrong executable; available features remain enabled.
+
+Startup failures offer **Show Output**, **Open Settings** and **Retry**. Correct the
+machine-scoped `iris.serverPath` in User settings, build the server if necessary,
+then retry or run **Iris: Restart Language Server** without reloading the window.
+Restarts are serialized, concurrent requests share one restart, and the previous
+client and file watchers are disposed before replacement. Unexpected connection
+closure is logged and requires an explicit restart. **Run File on VM** remains
+independent of language-server startup. Empty output or a running extension alone
+cannot establish the cause of missing providers; inspect the new startup evidence.
+Initialization has a 45-second deadline. Restarting during initial activation or
+deactivating interrupts a nonresponding server, closes its connection and retires
+its process before replacement. Late initialization cannot restore its providers.
 
 Use `Iris: Run File on VM` from the command palette for a saved local Iris file.
 First use **File > Open Folder** to open the script's directory in the development
@@ -55,7 +81,7 @@ class/module context; the contract snippet supplies a bodyless requirement.
 
 Use **Format Document** (Shift+Alt+F on Windows) to apply the official style in
 `../STYLE.md`, always using two spaces and a 120-column soft limit. The server must be rebuilt after updating: `cargo build -p iris-lsp`
-from the tools repository root, followed by **Developer: Reload Window**.
+from the tools repository root, followed by **Iris: Restart Language Server**.
 Formatting works on unsaved Iris buffers, including windows without a folder.
 
 To format when saving, merge this into user settings (it is not enabled automatically):
@@ -97,11 +123,32 @@ IRIS_TEST_EMPTY=1 npm run test:integration
 On PowerShell set `$env:IRIS_TEST_EXECUTABLE` or `$env:IRIS_TEST_EMPTY` before
 running the same npm command. The tests never rebuild the original Iris project.
 
+`npm run test:startup` runs separate fresh native VS Code hosts for automatic `.ir`
+and `.iris` recognition/provider availability, including real Hover results, and
+missing-executable recovery for both suffixes after a User
+setting correction. It never forces extension activation or reassigns the language.
+It uses an existing `.vscode-test` cache for VS Code 1.136.1, or the executable set
+in `VSCODE_EXECUTABLE_PATH`; it fails rather than downloading a missing editor.
+These tests use isolated temporary profiles, not your normal User settings.
+On POSIX hosts the startup suite also launches a local nonresponding executable
+to check interruption, the full 45-second deadline, deactivation and corrected
+restart. Controlled transports exercise late initialize replies and pending
+initialized writes against the installed language client. The executable fixture
+requires a POSIX shebang host and does not download a runtime.
+
+The integration suite calls `vscode.executeHoverProvider` against the real server
+for untitled Integer types, current-buffer type changes, annotated source method
+signatures, exact UTF-16 occurrence ranges and unknown-member refusal. Same-package
+tests change an unsaved target return type from Integer to String and require the
+caller's hover to update while retaining the caller's range, without saving the target.
+To run against an existing editor without downloads, set `VSCODE_EXECUTABLE_PATH`
+to the cached native VS Code executable before `npm run test:integration`.
+
 ## Limitations
 
 Semantic queries use current unsaved buffers. Cross-file queries use sources
 selected by `iris.toml` within the same manifest group; source and manifest file
-changes refresh the index. Standalone buffers remain isolated. Known receiver
+changes (`.ir`, `.iris` and `iris.toml`) refresh the index. Standalone buffers remain isolated. Known receiver
 types provide member completion, including incomplete trailing-dot edits.
 Omitted named-method parameter and return annotations display `Dynamic<Object>`;
 local types are inferred conservatively, and explicit annotations get no redundant
