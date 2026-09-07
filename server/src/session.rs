@@ -74,6 +74,7 @@ pub fn run_with_worker(
                         if matches!(
                             request.method.as_str(),
                             "textDocument/definition"
+                                | "textDocument/hover"
                                 | "textDocument/references"
                                 | "textDocument/completion"
                                 | "textDocument/inlayHint"
@@ -137,6 +138,7 @@ fn initialize(request: Request, phase: &mut Phase, semantics: &mut Semantics) ->
     }
     match serde_json::from_value::<InitializeParams>(request.params.clone()) {
         Ok(params) => {
+            semantics.hover_format = crate::hover::Format::negotiate(&params.capabilities);
             semantics.roots = params.workspace_folders.map_or_else(
                 || {
                     request
@@ -166,6 +168,7 @@ fn initialize(request: Request, phase: &mut Phase, semantics: &mut Semantics) ->
                             ..CompletionOptions::default()
                         }),
                         definition_provider: Some(lsp_types::OneOf::Left(true)),
+                        hover_provider: Some(lsp_types::HoverProviderCapability::Simple(true)),
                         references_provider: Some(lsp_types::OneOf::Left(true)),
                         inlay_hint_provider: Some(lsp_types::OneOf::Left(true)),
                         workspace: Some(lsp_types::WorkspaceServerCapabilities {

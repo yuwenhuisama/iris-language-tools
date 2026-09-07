@@ -23,6 +23,10 @@ mod lifecycle;
 #[path = "semantic_tests.rs"]
 mod tests;
 
+#[cfg(test)]
+#[path = "hover_lifecycle_tests.rs"]
+mod hover_tests;
+
 struct Pending {
     ticket: Ticket,
     id: Option<RequestId>,
@@ -51,6 +55,7 @@ pub struct Semantics {
     epoch: Epoch,
     next_ticket: u64,
     pub roots: Vec<Uri>,
+    pub hover_format: crate::hover::Format,
     inputs: Option<Arc<Inputs>>,
 }
 
@@ -62,6 +67,7 @@ impl Semantics {
             epoch: Epoch(0),
             next_ticket: 0,
             roots: Vec::new(),
+            hover_format: crate::hover::Format::default(),
             inputs: None,
         })
     }
@@ -83,7 +89,7 @@ impl Semantics {
         context: (&Connection, &Documents),
     ) -> anyhow::Result<()> {
         let (connection, documents) = context;
-        let query = match Query::decode(&request.method, request.params) {
+        let query = match Query::decode(&request.method, request.params, self.hover_format) {
             Ok(query) => query,
             Err(error) => {
                 connection
@@ -174,17 +180,37 @@ impl Semantics {
             let response = match finished.result {
                 Ok(result) => Response::new_ok(id, result),
                 Err(error) => {
-                    let code = match error {
+                    let code = match &error {
                         Failure::Cancelled => -32800,
                         Failure::Query(QueryError::Position) => -32602,
-                        Failure::Query(QueryError::Incomplete | QueryError::Target)
+                        Failure::Query(QueryError::Incomplete(_) | QueryError::Target)
                         | Failure::Workspace(_)
                         | Failure::Identity => -32803,
                     };
+                    let data = match &error {
+                        Failure::Query(QueryError::Incomplete(details)) => {
+                            Some(serde_json::json!({"inventory":details}))
+                        }
+                        Failure::Query(QueryError::Position | QueryError::Target)
+                        | Failure::Cancelled
+                        | Failure::Workspace(_)
+                        | Failure::Identity => None,
+                    };
                     if code == -32803 {
-                        notifications::log(connection, serde_json::json!({"event":"semantic.failed","id":id,"reason":error.to_string()}).to_string())?;
+                        let mut log = serde_json::json!({"event":"semantic.failed","id":id,"reason":error.to_string()});
+                        if let Some(data) = &data {
+                            log["inventory"] = data["inventory"].clone();
+                        }
+                        notifications::log(connection, log.to_string())?;
                     }
-                    Response::new_err(id, code, error.to_string())
+                    Response {
+                        id,
+                        response_result: Err(lsp_server::ResponseError {
+                            code,
+                            message: error.to_string(),
+                            data,
+                        }),
+                    }
                 }
             };
             connection.sender.send(response.into())?;

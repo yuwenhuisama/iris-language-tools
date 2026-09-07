@@ -1,12 +1,16 @@
 use iris_analysis::{AnalysisSnapshot, FileId, Span};
 use iris_lexer::ByteOffset;
 use lsp_types::{
-    CompletionItem, CompletionParams, GotoDefinitionParams, InlayHintParams, Position, Range,
-    ReferenceParams, Uri,
+    CompletionItem, CompletionParams, GotoDefinitionParams, HoverParams, InlayHintParams, Position,
+    Range, ReferenceParams, Uri,
 };
 use serde_json::{Value, json};
 
-use crate::{positions::LineIndex, workspace::Snapshot};
+use crate::{
+    hover::{self, Format},
+    positions::LineIndex,
+    workspace::{InventoryDetails, Snapshot},
+};
 
 #[path = "semantic_completion.rs"]
 mod completion;
@@ -17,6 +21,7 @@ pub enum Operation {
     References(Position, bool),
     Completion(Position),
     Hints(Range),
+    Hover(Position, Format),
 }
 
 #[derive(Clone, Debug)]
@@ -30,14 +35,22 @@ pub enum QueryError {
     #[error("position is outside the document or splits a UTF-16 surrogate pair")]
     Position,
     #[error("workspace inventory is incomplete; references cannot be exhaustive")]
-    Incomplete,
+    Incomplete(InventoryDetails),
     #[error("semantic target is outside its source")]
     Target,
 }
 
 impl Query {
-    pub fn decode(method: &str, params: Value) -> Result<Self, serde_json::Error> {
+    pub fn decode(method: &str, params: Value, format: Format) -> Result<Self, serde_json::Error> {
         match method {
+            "textDocument/hover" => {
+                let params: HoverParams = serde_json::from_value(params)?;
+                let position = params.text_document_position_params;
+                Ok(Self {
+                    uri: position.text_document.uri,
+                    operation: Operation::Hover(position.position, format),
+                })
+            }
             "textDocument/definition" => {
                 let params: GotoDefinitionParams = serde_json::from_value(params)?;
                 let position = params.text_document_position_params;
@@ -80,7 +93,9 @@ impl Query {
     ) -> Result<Value, QueryError> {
         let (snapshot, analysis) = context;
         if matches!(self.operation, Operation::References(_, _)) && !snapshot.is_complete() {
-            return Err(QueryError::Incomplete);
+            return Err(QueryError::Incomplete(InventoryDetails::from_issues(
+                &snapshot.issues,
+            )));
         }
         let Some(source) = snapshot.file(&self.uri) else {
             if snapshot
@@ -88,10 +103,13 @@ impl Query {
                 .iter()
                 .any(|issue| issue.uri.as_ref() == Some(&self.uri))
             {
-                return Err(QueryError::Incomplete);
+                return Err(QueryError::Incomplete(InventoryDetails::from_issues(
+                    &snapshot.issues,
+                )));
             }
             return Ok(match self.operation {
                 Operation::Completion(_) => json!(keywords),
+                Operation::Hover(_, _) => Value::Null,
                 Operation::Definition(_) | Operation::References(_, _) | Operation::Hints(_) => {
                     json!([])
                 }
@@ -112,6 +130,16 @@ impl Query {
                 .ok_or(QueryError::Position)
         };
         match self.operation {
+            Operation::Hover(position, format) => {
+                let Some(info) = analysis.hover(file, offset(position)?) else {
+                    return Ok(Value::Null);
+                };
+                let range = span_range(&index, info.span)?;
+                Ok(json!(lsp_types::Hover {
+                    contents: lsp_types::HoverContents::Markup(hover::render(&info, format)),
+                    range: Some(range),
+                }))
+            }
             Operation::Definition(position) => analysis
                 .definitions(file, offset(position)?)
                 .into_iter()

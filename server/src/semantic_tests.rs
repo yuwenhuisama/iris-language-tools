@@ -10,6 +10,7 @@ fn coordinator(worker: SemanticWorker) -> Semantics {
         epoch: Epoch(0),
         next_ticket: 0,
         roots: Vec::new(),
+        hover_format: crate::hover::Format::default(),
         inputs: None,
     }
 }

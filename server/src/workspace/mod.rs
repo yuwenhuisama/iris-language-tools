@@ -1,11 +1,13 @@
 //! Read-only inventory for a future worker. Capture overlays on the coordinator;
 //! call `reload`/`replace_roots` off the main loop. No runtime or dependency loading.
 mod claims;
+mod details;
 mod discovery;
 mod inventory;
 mod overlay;
 mod paths;
 
+pub use details::InventoryDetails;
 pub use inventory::Workspace;
 pub use overlay::{DocumentGeneration, DocumentVersion, OverlaySet};
 

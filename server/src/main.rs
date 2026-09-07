@@ -5,6 +5,7 @@ mod documents;
 mod formatting;
 #[cfg(all(test, unix))]
 mod formatting_tests;
+mod hover;
 mod notifications;
 mod positions;
 mod semantic_query;
