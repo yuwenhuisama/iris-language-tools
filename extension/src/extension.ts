@@ -9,10 +9,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   context.subscriptions.push(vscode.commands.registerCommand("iris.runFile", runFile));
   const command = vscode.workspace.getConfiguration("iris").get<string>("serverPath", "iris-lsp");
   const output = vscode.window.createOutputChannel("Iris Language Server");
-  context.subscriptions.push(output);
+  const fileEvents = [
+    vscode.workspace.createFileSystemWatcher("**/*.iris"),
+    vscode.workspace.createFileSystemWatcher("**/iris.toml"),
+  ];
+  context.subscriptions.push(output, ...fileEvents);
   client = new LanguageClient("iris", "Iris Language Server", { command }, {
     documentSelector: [{ scheme: "file", language: "iris" }, { scheme: "untitled", language: "iris" }],
     outputChannel: output,
+    synchronize: { fileEvents },
     middleware: {
       provideDocumentFormattingEdits: async (document, options, token, next) => {
         const edits = await next(document, options, token);

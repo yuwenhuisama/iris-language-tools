@@ -25,7 +25,7 @@ function expand(body) {
 if (process.env.IRIS_EDITING_HOST !== '1') {
   test('uses overridable Iris-only spaces when language defaults are contributed', () => {
     const defaults = manifest.contributes.configurationDefaults;
-    assert.deepEqual(defaults, { '[iris]': { 'editor.tabSize': 2, 'editor.insertSpaces': true } });
+    assert.deepEqual(defaults, { '[iris]': { 'editor.tabSize': 2, 'editor.insertSpaces': true, 'editor.inlayHints.enabled': 'on' } });
   });
 
   for (const [before, after] of [

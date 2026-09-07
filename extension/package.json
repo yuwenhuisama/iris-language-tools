@@ -1,7 +1,7 @@
 {
   "name": "iris-language-tools",
   "displayName": "Iris Language Tools",
-  "description": "Local Iris v1 lexical diagnostics, keyword completion and VM runner.",
+  "description": "Local Iris v1 diagnostics, definitions, references, symbol/member completion, type hints, formatting and VM runner.",
   "version": "0.1.0",
   "private": true,
   "publisher": "iris-local",
@@ -14,7 +14,7 @@
     "languages": [{ "id": "iris", "aliases": ["Iris", "iris"], "extensions": [".iris"], "configuration": "./language-configuration.json" }],
     "grammars": [{ "language": "iris", "scopeName": "source.iris", "path": "./syntaxes/iris.tmLanguage.json" }],
     "snippets": [{ "language": "iris", "path": "./snippets/iris.json" }],
-    "configurationDefaults": { "[iris]": { "editor.tabSize": 2, "editor.insertSpaces": true } },
+    "configurationDefaults": { "[iris]": { "editor.tabSize": 2, "editor.insertSpaces": true, "editor.inlayHints.enabled": "on" } },
     "commands": [{ "command": "iris.runFile", "title": "Iris: Run File on VM", "enablement": "isWorkspaceTrusted && editorLangId == iris && resourceScheme == file" }],
     "configuration": {
       "title": "Iris",

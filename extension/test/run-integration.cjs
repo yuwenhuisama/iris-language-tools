@@ -5,10 +5,11 @@ const os = require('node:os');
 const path = require('node:path');
 
 async function main() {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'iris-editor-'));
+  const root = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), 'iris-editor-')));
   try {
     const workspace = path.join(root, 'workspace with spaces');
     await fs.mkdir(workspace);
+    await require('./semantic-workspace.cjs').prepare(workspace);
     const server = path.resolve(__dirname, '../../target/debug', process.platform === 'win32' ? 'iris-lsp.exe' : 'iris-lsp');
     await fs.access(server);
     const user = path.join(root, 'profile');
@@ -35,6 +36,7 @@ async function main() {
         IRIS_EDITING_HOST: '1',
         IRIS_EDITING_ENTER: process.env.IRIS_EDITING_ENTER ?? '',
         IRIS_TEST_EMPTY: process.env.IRIS_TEST_EMPTY ?? '',
+        IRIS_TEST_WORKSPACE: workspace,
         IRIS_TEST_EXECUTABLE: process.env.IRIS_TEST_EXECUTABLE ?? '',
       },
       launchArgs: [...(process.env.IRIS_TEST_EMPTY === '1' ? [] : [workspace]), '--user-data-dir', user, '--extensions-dir', path.join(root, 'extensions'), '--disable-workspace-trust', '--skip-welcome', '--skip-release-notes'],
