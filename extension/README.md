@@ -40,7 +40,7 @@ shell command string. VM refusals remain visible; there is no evaluator fallback
 
 ## Editing and Formatting
 
-Iris defaults to four spaces (overridable). Conservative indentation and Enter
+Iris defaults to two spaces (overridable while typing). Conservative indentation and Enter
 rules handle braces, hashes, parentheses and brackets. Lines with literal or
 comment markers deliberately avoid extra indentation; these declarative rules
 are not a complete parser for multiline lexical context.
@@ -50,8 +50,8 @@ Eight snippets are available through **Insert Snippet** or completion:
 Use Tab to move through the editable fields. A `fun` snippet is a method in its
 class/module context; the contract snippet supplies a bodyless requirement.
 
-Use **Format Document** (Shift+Alt+F on Windows) to normalize leading code
-indentation. The server must be rebuilt after updating: `cargo build -p iris-lsp`
+Use **Format Document** (Shift+Alt+F on Windows) to apply the official style in
+`../STYLE.md`, always using two spaces and a 120-column soft limit. The server must be rebuilt after updating: `cargo build -p iris-lsp`
 from the tools repository root, followed by **Developer: Reload Window**.
 Formatting works on unsaved Iris buffers, including windows without a folder.
 
@@ -64,17 +64,25 @@ To format when saving, merge this into user settings (it is not enabled automati
 }
 ```
 
-The formatter preserves existing line endings, line breaks and inline spacing.
-It does not reflow comments, strings or long lines. Unsupported literal forms,
-continuations, lexical errors and unbalanced delimiters produce no edits rather
-than guessed changes. Selection formatting and on-type LSP formatting are not
-implemented.
+Named methods and control bodies expand; `else` starts a new line while `catch`
+and `finally` stay attached when comments permit. Spacing, ordinary semicolons,
+multiline lists and blank lines are normalized without reordering declarations.
+Simple closures can remain inline; their header separator is retained.
 
-The whole document is conservatively left unchanged for raw, triple-quoted or
-interpolated literals and explicit continuations. Marker checks can also skip a
-document when those sequences occur inside a comment or ordinary string.
-The limits are 256 KiB input, 128 delimiter levels and 1 MiB output; tab sizes
-1 through 16 are supported. This is indentation formatting, not a pretty-printer.
+Literal spellings and comment bodies are preserved. Exterior line endings become
+LF with one final newline, but the editor refuses a result containing protected
+CR bytes rather than normalize literal or block-comment contents globally.
+Existing UTF-8 BOM encoding is controlled by VS Code's **Save with Encoding**,
+not by LSP text edits; use UTF-8 without BOM for new source files.
+Invalid or unsupported input, explicit continuations, parse disagreement and
+resource limits produce no edits. Check **Iris Language Server** output for a
+skip reason. Selection and on-type LSP formatting remain unimplemented.
+
+The limits are 256 KiB input, 128 delimiter levels, and 1 MiB output, with a
+two-second worker computation deadline after readiness. Valid editor indentation
+options are accepted but cannot change the fixed official style. Update and
+rebuild the companion Iris CLI too: the new layout requires the frontend's
+newline/list and exact token-span repairs.
 
 Tests can also compare original/formatted programs on an existing CLI:
 

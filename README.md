@@ -20,7 +20,8 @@ Project/
     extension/
 ```
 
-The server uses a local Cargo path dependency on the existing `iris-lexer`.
+The formatter uses local Cargo path dependencies on `iris-lexer`, `iris-parser`
+and `iris-syntax` from the language repository.
 No compiler source is copied into this repository. The inspected language
 checkout was at `91c1b8dd68e69978c6b268a5d487017396c70737` with existing local
 changes; this is provenance, not a pinned dependency. The sibling checkout's
@@ -36,7 +37,7 @@ historical Notepad++ highlighting are not the v1 grammar authority.
 - UTF-16 positions and located lexical diagnostics from the existing lexer.
 - Keyword completion, not type-directed or member completion.
 - VS Code `.iris` registration, TextMate highlighting, and VM run command.
-- Conservative full-document indentation formatting through the LSP.
+- Official-style document formatting through a bounded, isolated LSP worker.
 - Iris indentation/Enter rules and eight editable code snippets.
 
 The upstream parser currently reports codes without source ranges, so parser
@@ -56,10 +57,16 @@ end rather than inspection of runtime state.
 
 ## Formatting
 
+The canonical rules are in [STYLE.md](STYLE.md): two spaces, a 120-column soft
+limit, multiline named methods, newline-before-`else`, same-line `catch` and
+`finally`, and no ordinary statement-ending semicolons. The formatter also
+normalizes spacing, wraps lists with legal trailing commas, separates named
+declarations, and preserves literal contents and source order.
+
 Use **Format Document** in VS Code. Formatting operates on the current unsaved
-buffer and adjusts leading indentation only, honoring the editor's tab/space
-options. It does not wrap lines, relocate braces, normalize operators, remove
-trailing whitespace, or rewrite comments and literal contents.
+buffer. Editor tab/space preferences do not override the official layout.
+The original and candidate must parse to the same AST, ignoring source locations,
+and pass additional literal/comment/token preservation checks before edits are returned.
 
 To opt into format-on-save, merge this into user settings:
 
@@ -70,10 +77,16 @@ To opt into format-on-save, merge this into user settings:
 }
 ```
 
-Raw, triple-quoted or interpolated literals, explicit line continuations,
-lexical errors and unbalanced delimiters are conservative no-edit cases.
-This formatter is not a parser or a syntax validator. It may indent lexically
-complete, balanced code that is still syntactically invalid.
+Raw, triple-quoted and interpolated literals are preserved, not rewritten.
+Explicit line continuations and unsupported or uncertain syntax remain no-edit
+cases. The formatter does not repair invalid code. VS Code may also refuse an
+edit when its document-wide EOL model would change protected CRLF contents.
+Existing encoding-level BOM removal is not guaranteed by an LSP text edit.
+
+This version requires the companion frontend changes in `Iris-Language`: exclusive
+token end spans, corrected numeric/literal boundaries, and contextual newline
+parsing. Rebuild both `iris-lsp` and the `iris` CLI after updating both checkouts;
+older CLIs can reject the new layout, notably newline-before-`else` and multiline lists.
 
 ## Build and Test
 
