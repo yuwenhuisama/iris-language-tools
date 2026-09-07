@@ -62,3 +62,10 @@ pub struct TypeHint {
     pub offset: usize,
     pub label: String,
 }
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct HoverInfo {
+    pub span: Span,
+    pub signature: String,
+    pub type_label: Option<String>,
+}

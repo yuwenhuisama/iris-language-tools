@@ -54,7 +54,7 @@ impl AnalysisSnapshot {
             .map(|(_, key, _)| *key)
     }
 
-    fn occurrences(&self, file: FileId) -> Vec<(Span, Key, bool)> {
+    pub(crate) fn occurrences(&self, file: FileId) -> Vec<(Span, Key, bool)> {
         let document = &self.documents[&file];
         let mut sites = Vec::new();
         for node in &document.source.nodes {

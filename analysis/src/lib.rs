@@ -6,6 +6,7 @@
 mod binding_types;
 mod completion;
 mod hints;
+mod hover;
 mod index;
 mod keyword_context;
 mod members;

@@ -19,6 +19,7 @@ let definitions = snapshot.definitions(FileId(1), 29);
 let references = snapshot.references(FileId(1), 18, true);
 let completions = snapshot.completions(FileId(1), 32);
 let hints = snapshot.inlay_hints(FileId(1), Span { start: 0, end: source.len() });
+let hover = snapshot.hover(FileId(1), 28);
 ```
 
 - `SourceInput { id: FileId, text: Arc<str>, group: GroupId }`.
@@ -36,6 +37,13 @@ let hints = snapshot.inlay_hints(FileId(1), Span { start: 0, end: source.len() }
   `Class`, `Module`, `Contract`, `TypeAlias`, `Method`, or `Property`.
 - `inlay_hints(file, range) -> Vec<TypeHint>` where
   `TypeHint { offset: usize, label: String }`. Labels include `: ` or ` -> `.
+- `hover(file: FileId, byte: usize) -> Option<HoverInfo>` where
+  `HoverInfo { span: Span, signature: String, type_label: Option<String> }`.
+  The span is the exact occurrence in the requested file, including an import
+  alias, rather than the target declaration's span. Unlike navigation, hover
+  accepts only positions inside the half-open occurrence, not immediately after
+  a name. Invalid UTF-8 boundaries, protected text, ambiguity, and unsafe recovery
+  positions return `None`.
 
 All coordinates are UTF-8 bytes; spans and hint request ranges are half-open.
 Completion replacement ranges can extend past the cursor to replace an existing
@@ -92,6 +100,23 @@ are beyond the query/name. Incomplete members retain replacement anchors, and
 completion marks parser recovery as incomplete. Protected comments and literal
 regions never receive semantic completions.
 
+Hover signatures preserve grammar-owned headers and original literal/default
+token bytes without evaluating them or including declaration bodies. Nominal
+headers show declaration identity, not an instance annotation. Method signatures
+retain source visibility, surface, modifiers, generic parameters, and ordered
+parameter channels, including discard parameters. Omitted visibility is made
+explicit; omitted named-method parameter and return annotations are displayed as
+`Dynamic<Object>`. Rest parameter signatures show their element annotations while
+`type_label` reports their body container types. For methods, `type_label` is the
+declared return annotation (or `Dynamic<Object>`), not an inferred callable type.
+Written `typeof` remains in the signature but has no inferred type label.
+
+Signature and type-label payloads together are bounded to 4096 UTF-8 bytes, with
+at most 1024 bytes for the type label. Text is accumulated incrementally and
+truncated at character boundaries with `... [truncated]`. Trivia is compacted
+without rewriting literal token contents. No documentation is extracted: the
+source graph does not promise reliable comment attachment.
+
 ## Conservative Limits
 
 - A group ID does not encode a package ID. Dotted package imports are therefore
@@ -117,6 +142,7 @@ regions never receive semantic completions.
 cargo test -p iris-analysis
 cargo clippy -p iris-analysis --all-targets -- -D warnings
 cargo fmt -p iris-analysis -- --check
+cargo run -p iris-analysis --example hover
 ```
 
 Integration tests import the public crate and use the real parser. The snapshot
