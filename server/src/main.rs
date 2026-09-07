@@ -2,6 +2,7 @@
 mod diagnostic_tests;
 mod diagnostics;
 mod documents;
+mod formatting;
 mod notifications;
 mod positions;
 mod session;

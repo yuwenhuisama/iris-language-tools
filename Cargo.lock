@@ -113,6 +113,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "iris-formatter"
+version = "0.1.0"
+dependencies = [
+ "iris-lexer",
+]
+
+[[package]]
 name = "iris-lexer"
 version = "0.1.0"
 dependencies = [
@@ -124,6 +131,7 @@ name = "iris-lsp"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "iris-formatter",
  "iris-lexer",
  "lsp-server",
  "lsp-types",

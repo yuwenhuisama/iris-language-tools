@@ -8,7 +8,7 @@ use lsp_types::{
 };
 use serde_json::json;
 
-use crate::{documents::Documents, notifications};
+use crate::{documents::Documents, formatting, notifications};
 
 enum Phase {
     Initialize,
@@ -39,6 +39,9 @@ pub fn run(connection: &Connection) -> anyhow::Result<ExitCode> {
                         -32002,
                         "awaiting initialized notification".into(),
                     ),
+                    Phase::Running if request.method == "textDocument/formatting" => {
+                        formatting::respond(request, &documents)
+                    }
                     Phase::Running => respond(request, &completions, &mut phase),
                     Phase::Shutdown => {
                         Response::new_err(request.id, -32600, "server has shut down".into())
@@ -106,6 +109,7 @@ fn initialize(request: Request, phase: &mut Phase) -> Response {
                             },
                         )),
                         completion_provider: Some(CompletionOptions::default()),
+                        document_formatting_provider: Some(lsp_types::OneOf::Left(true)),
                         ..ServerCapabilities::default()
                     },
                     server_info: Some(ServerInfo {
