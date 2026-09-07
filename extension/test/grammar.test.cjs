@@ -52,7 +52,7 @@ test('triple strings continue across physical lines', () => {
 
 test('registers only Iris v1 files and prevents execution in untrusted workspaces', () => {
   const manifest = require('../package.json');
-  assert.deepEqual(manifest.contributes.languages[0].extensions, ['.iris']);
+  assert.deepEqual(manifest.contributes.languages[0].extensions, ['.iris', '.ir']);
   assert.equal(manifest.capabilities.untrustedWorkspaces.supported, false);
   assert.equal(manifest.contributes.configuration.properties['iris.serverPath'].scope, 'machine');
 });

@@ -20,6 +20,7 @@ exports.run = async function () {
   const extension = vscode.extensions.getExtension('iris-local.iris-language-tools');
   assert.ok(extension);
   await extension.activate();
+  await require('./hover-integration.cjs').verifyHover();
   await require('./semantic-integration.cjs').verifySemantics();
   await require('./editing.test.cjs').run();
   await require('./formatting-integration.cjs').verifyFormatting();

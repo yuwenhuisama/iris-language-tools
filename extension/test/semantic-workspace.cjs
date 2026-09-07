@@ -17,6 +17,7 @@ exports.prepare = async function (root) {
 exports.verifyWorkspace = async function () {
   const vscode = require('vscode');
   const { eventually, provider, position, range, coordinates, locations, location, hints, hint, replace } = require('./semantic-support.cjs');
+  const { assertHover } = require('./hover-integration.cjs');
   const root = process.env.IRIS_TEST_WORKSPACE;
   assert.ok(root, 'The runner must supply its isolated workspace');
   assert.equal(await fs.realpath(vscode.workspace.workspaceFolders[0].uri.fsPath), await fs.realpath(root));
@@ -38,6 +39,7 @@ exports.verifyWorkspace = async function () {
     location(source.uri, range(caller, 'read')),
   ]));
   const initialHints = await hints(source);
+  await assertHover(source, range(caller, 'read'), [/\bread\s*\(/, /->\s*Integer\b/]);
   assert.ok(initialHints.some(value => JSON.stringify(value) === JSON.stringify(hint(caller, resultOffset, ': Integer'))));
   const initialMembers = await provider('CompletionItem', source, memberCursor);
   assert.deepEqual(initialMembers.items.map(item => item.label), ['read']);
@@ -76,12 +78,14 @@ exports.verifyWorkspace = async function () {
         assert.deepEqual(coordinates(item.range), coordinates(range(caller, 're', caller.lastIndexOf('re }'))));
       }
       const updatedHints = await hints(source);
+      const hover = await assertHover(source, range(caller, 'read'), [/\bread\s*\(/, /->\s*String\b/]);
+      assert.doesNotMatch(hover, /->\s*Integer\b/);
       assert.ok(updatedHints.some(value => JSON.stringify(value) === JSON.stringify(hint(caller, resultOffset, ': String'))));
       assert.ok(!updatedHints.some(value => JSON.stringify(value) === JSON.stringify(hint(caller, resultOffset, ': Integer'))));
     });
     assert.equal(target.isDirty, true);
     assert.equal(await fs.readFile(targetUri.fsPath, 'utf8'), diskEdit, 'Semantic queries must not save or execute dirty targets');
-    console.log('PASS: unsaved cross-file edits update exact definitions/references, new members and String hints without saving');
+    console.log('PASS: unsaved cross-file edits update exact definitions/references, new members, String hints and call-site Hover without saving');
   } finally {
     await vscode.window.showTextDocument(target);
     await vscode.commands.executeCommand('workbench.action.revertAndCloseActiveEditor');
