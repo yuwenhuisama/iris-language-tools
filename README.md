@@ -31,29 +31,54 @@ The keyword inventory follows `IRIS-V1-GRAMMAR-C013` and the `C072` erratum:
 50 reserved words, including `typeof` and `yield`. Legacy `.ir` syntax and
 historical Notepad++ highlighting are not the v1 grammar authority.
 
-## MVP Boundary
+## Features and Scope
 
 - Stdio LSP with full synchronization of open, unsaved documents.
-- UTF-16 positions and located lexical diagnostics from the existing lexer.
-- Keyword completion, not type-directed or member completion.
-- VS Code `.iris` registration, TextMate highlighting, and VM run command.
+- UTF-16 positions and located lexical diagnostics from the scanner allowlist.
+- Static semantic navigation: Go to Definition (`F12` / `Ctrl+Click`) and Find References (`Shift+F12`).
+- Smart completion for variables, parameters, constants, source classes, modules, contracts, type aliases, and known typed members alongside keywords.
+- Type inlay hints showing local variable types, literal types, and explicit method return annotations.
+- Same-package cross-file resolution using manifest source lists from `iris.toml`.
 - Official-style document formatting through a bounded, isolated LSP worker.
-- Iris indentation/Enter rules and eight editable code snippets.
+- VS Code `.iris` registration, TextMate syntax highlighting, Enter/indentation rules, and eight snippets.
+- Explicit Iris CLI `--vm` run command for trusted workspaces.
 
-The upstream parser currently reports codes without source ranges, so parser
-and static-analysis diagnostics are not exposed yet. Some upstream literal
-diagnostics use a placeholder offset; those must be logged as unlocated
-rather than presented as misleading start-of-file squiggles. A clean Problems
-panel is therefore not a guarantee that the program parses or runs.
+### Static Semantic Support
 
-No user program is executed for diagnostics or completion. The explicit run
-command is separate and uses the `iris` CLI's `--vm` mode. Executable startup
-requires a trusted VS Code workspace.
+Static queries run in a dedicated background worker thread over immutable analysis snapshots:
 
-Definitions, references, rename, semantic tokens, workspace package
-resolution, and debugging are not implemented in this MVP. They require
-source ranges, recovery, and a queryable semantic layer in the language front
-end rather than inspection of runtime state.
+- **Definition (`F12` / `Ctrl+Click`)**: Jumps to the exact declaration site of symbols across open buffers and same-package files. Unknown targets return empty results without guessing.
+- **References (`Shift+F12`)**: Finds statically resolved symbol references across the package resolution group. References are static symbol bindings, not all possible dynamic runtime call targets.
+- **Completion**: Offers in-scope identifiers, known member access, and keywords. Keywords are suppressed inside member dots, namespace qualifiers, string literals, and comments. Incomplete recovery regions retain replacement spans.
+- **Inlay Hints**: Shows local inferred types for unannotated bindings and literals. Omitted method parameter and return annotations remain `Dynamic<Object>` under `TYPES-C003`; method bodies do not create inferred signature hints.
+- **Workspace Packages**: Discovers `iris.toml` manifests and tracks explicit `sources` lists. Open unsaved editor buffers serve as overlays that take precedence over disk. Standalone files and conflicting package declarations remain safely isolated. The server reads manifest sources when needed and never writes to disk.
+
+### Boundaries and Limitations
+
+- **No runtime execution for analysis**: Diagnostics and queries inspect static source graph facts only. Code is never evaluated or executed to resolve types or symbols.
+- **Parser recovery scope**: Recovery in `iris-parser` preserves usable declarations across trailing EOF block braces and incomplete dot receivers (`receiver.`). Partial namespace identifiers (`Namespace::Prefix`) resolve, but bare trailing namespace separators (`Namespace::`) without an identifier production are suppressed.
+- **Conservative resolution**: Inherited members, mixin composition, contract views, generic type substitution, re-export facades, dynamic monkey patching, and external package imports are not synthesized or guessed.
+- **Diagnostics**: Real-time editor diagnostics remain lexer-only scanner errors. Parser syntax errors do not emit squiggles in the editor.
+- **File watching**: Protocol support for watched file changes is present on the server, while extension client file watchers are still in progress. Saving buffers or modifying workspace folders reloads the workspace snapshot.
+- **Tooling in progress**: Rename, semantic token highlighting, and interactive debugging are not yet implemented.
+
+```toml
+# Example iris.toml manifest for same-package resolution
+manifest_version = 1
+package_id = "org.example.app"
+api_major = 1
+version = "0.1.0"
+iris_major = 1
+sources = [
+  "main.iris",
+  "utils.iris"
+]
+entry_modules = ["Main"]
+
+[permissions]
+required = []
+optional = []
+```
 
 ## Formatting
 
@@ -87,6 +112,19 @@ This version requires the companion frontend changes in `Iris-Language`: exclusi
 token end spans, corrected numeric/literal boundaries, and contextual newline
 parsing. Rebuild both `iris-lsp` and the `iris` CLI after updating both checkouts;
 older CLIs can reject the new layout, notably newline-before-`else` and multiline lists.
+
+## Upgrade and Rebuild
+
+Building the language server depends directly on the sibling `Iris-Language` parser,
+syntax, and lexer crates. When updating either checkout, rebuild the server to ensure
+binary compatibility with the companion frontend:
+
+```sh
+cargo build -p iris-lsp
+```
+
+Rebuild the companion `iris` CLI in `Iris-Language` as well if you use VM run commands
+or formatted output that relies on updated grammar rules.
 
 ## Build and Test
 

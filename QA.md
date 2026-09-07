@@ -1,5 +1,56 @@
 # Local MVP Verification
 
+## Semantic Editor Milestone
+
+The following evidence covers the uncommitted semantic-editor implementation.
+The formatter-era evidence below is retained as historical context; its approval
+does not approve this new milestone. The first semantic gate returned REJECT:
+nominal header annotations and rest parameter annotations fabricated instance
+receiver types, while valid discard parameters marked callable scopes damaged.
+Those issues now have parser metadata fixes, category-aware binding types, and
+real-protocol regressions across all four providers. Independent reruns passed
+273 tools tests and 164 parser tests; the normal editor integration was refreshed
+successfully, including a subsequent empty-workspace run. The focused Oracle
+re-review returned APPROVE with high confidence for the three fixes. It
+independently passed 54 analysis tests, five real-stdio tests covering 14 receiver
+scenarios plus discards, and six focused parser tests. One parser launch timed
+out before test output; the unchanged retry passed. No unresolved blocker remains
+from the semantic gate findings. Approval is limited to the documented static
+editor scope and does not certify unsupported resolution or untested platforms.
+
+| Check | Command or surface | Result |
+| --- | --- | --- |
+| Tools workspace | `cargo test --workspace --locked -- --test-threads=1` | 273 pass: 54 analysis, 105 formatter, 114 server |
+| Strict Rust lint | `cargo clippy --workspace --all-targets --locked -- -D warnings` | Pass |
+| Rust formatting | `cargo fmt -p iris-analysis -p iris-lsp -p iris-formatter -- --check` | Pass |
+| Extension | `npm test` | 68 pass, including TypeScript checking and bundle |
+| Real VS Code normal workspace | `npm run test:integration` | All four providers and cross-file scenarios pass |
+| Real VS Code empty workspace | `IRIS_TEST_EMPTY=1 npm run test:integration` | All four single-file providers and existing run guard pass |
+| Runtime regression | `cargo test -p iris-vm -p iris-eval --lib --locked` in sibling checkout, isolated target | 742 pass, 1 ignored |
+
+The real editor scenarios are in `extension/test/semantic-integration.cjs` and
+`semantic-workspace.cjs`. They verify exact UTF-16 definitions, references excluding
+shadowed locals, prefix replacement, known instance-member completion, incomplete
+trailing dots, local Integer hints, omitted method contracts as Dynamic<Object>,
+and no redundant hints on written annotations. A manifest-backed two-file fixture
+verifies disk source/manifest watches and unsaved target edits updating definition
+positions, references, candidates and return-type hints without saving or execution.
+The parent also exercised all four providers through a direct real stdio client.
+
+The latest editor runs deliberately left `IRIS_TEST_EXECUTABLE` unset: optional
+VM-formatting equivalence was reported as skipped, not passed. Semantic fixtures
+are never executed. Definition-provider behavior is tested through real VS Code
+commands; physical modifier-click gestures and screenshot rendering of hint text
+have not been separately verified. Windows and minimum-version limits still apply.
+
+Cross-file coverage is same-package manifest-listed source only; standalone files
+remain isolated. External package imports, inheritance/mixin composition, generic
+substitution and runtime-added members are not resolved speculatively. References
+are statically resolved occurrences, not all potential dynamic calls. Unknown
+types produce no concrete hint. Syntax-error recovery is intentionally limited.
+
+## Earlier Formatter Verification
+
 Verified on macOS arm64 with Rust 1.97.1, Node 23.2.0, and an isolated VS Code
 1.136.1 Extension Development Host. Minimum supported Rust/VS Code versions
 and Windows platforms have not been separately tested. Node LTS is recommended
