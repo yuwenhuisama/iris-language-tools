@@ -15,6 +15,7 @@ Project/
     crates/iris-lexer/
   iris-language-tools/
     language/keywords.json
+    formatter/
     server/
     extension/
 ```
@@ -35,6 +36,8 @@ historical Notepad++ highlighting are not the v1 grammar authority.
 - UTF-16 positions and located lexical diagnostics from the existing lexer.
 - Keyword completion, not type-directed or member completion.
 - VS Code `.iris` registration, TextMate highlighting, and VM run command.
+- Conservative full-document indentation formatting through the LSP.
+- Iris indentation/Enter rules and eight editable code snippets.
 
 The upstream parser currently reports codes without source ranges, so parser
 and static-analysis diagnostics are not exposed yet. Some upstream literal
@@ -46,10 +49,31 @@ No user program is executed for diagnostics or completion. The explicit run
 command is separate and uses the `iris` CLI's `--vm` mode. Executable startup
 requires a trusted VS Code workspace.
 
-Definitions, references, rename, semantic tokens, formatting, workspace package
+Definitions, references, rename, semantic tokens, workspace package
 resolution, and debugging are not implemented in this MVP. They require
 source ranges, recovery, and a queryable semantic layer in the language front
 end rather than inspection of runtime state.
+
+## Formatting
+
+Use **Format Document** in VS Code. Formatting operates on the current unsaved
+buffer and adjusts leading indentation only, honoring the editor's tab/space
+options. It does not wrap lines, relocate braces, normalize operators, remove
+trailing whitespace, or rewrite comments and literal contents.
+
+To opt into format-on-save, merge this into user settings:
+
+```json
+"[iris]": {
+  "editor.defaultFormatter": "iris-local.iris-language-tools",
+  "editor.formatOnSave": true
+}
+```
+
+Raw, triple-quoted or interpolated literals, explicit line continuations,
+lexical errors and unbalanced delimiters are conservative no-edit cases.
+This formatter is not a parser or a syntax validator. It may indent lexically
+complete, balanced code that is still syntactically invalid.
 
 ## Build and Test
 
@@ -58,7 +82,7 @@ From this repository, with Rust 1.93 or newer and a compatible Node.js installed
 ```sh
 cargo build -p iris-lsp
 cargo test --workspace
-cargo fmt --package iris-lsp -- --check
+cargo fmt --package iris-lsp --package iris-formatter -- --check
 cargo clippy --workspace --all-targets -- -D warnings
 ```
 

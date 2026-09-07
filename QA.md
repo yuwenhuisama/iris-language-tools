@@ -6,11 +6,11 @@ have not been separately tested. Node LTS is recommended for development.
 
 | Check | Command or surface | Result |
 | --- | --- | --- |
-| Rust unit and real stdio protocol tests | `cargo test --workspace --locked` | 10 unit + 8 protocol tests pass |
+| Rust unit and real stdio protocol tests | `cargo test --workspace --locked` | 48 tests pass: 21 formatter, 10 server unit, 17 protocol |
 | Rust build | `cargo build -p iris-lsp --locked` | Pass |
 | Rust lint | `cargo clippy --workspace --all-targets --locked -- -D warnings` | Pass |
-| Rust format | `cargo fmt --package iris-lsp -- --check` | Pass |
-| Extension type check, bundle, tokenizer and VM command tests | `npm test` in `extension/` | 10 tests pass |
+| Rust format | `cargo fmt --package iris-lsp --package iris-formatter -- --check` | Pass |
+| Extension type check, bundle, editing, tokenizer and VM command tests | `npm test` in `extension/` | 68 tests pass |
 | Real editor/server integration | `npm run test:integration` in `extension/` | Pass; host exits 0 |
 | Existing VM execution | `iris --vm -e 'print("Iris tooling smoke")'` | Expected text, exit 0 |
 | Upstream lexer/parser baseline | `cargo test --locked -p iris-lexer -p iris-parser` in Iris | 44 + 100 tests pass |
@@ -49,3 +49,30 @@ application's Info.plist. `VSCODE_EXECUTABLE_PATH` may select an existing editor
 
 This is lexical tooling, not proof of program validity. See the server's
 diagnostic location audit and extension limitations before extending coverage.
+
+## Formatting And Editing Verification
+
+The formatter and LSP now pass real editor checks for unsaved CRLF/astral-Unicode
+documents, applying all edits, second-format no-op, and explicit format-on-save.
+Saving an unclosed block preserves the input unchanged. VS Code may minimize a
+server's full-document edit into several edits, so editor tests assert resulting
+text rather than the number of protocol edits.
+
+`IRIS_TEST_EMPTY=1 npm run test:integration` also passes: formatting and snippets
+work without an open folder, while the previous VM run guard still refuses
+before saving or launching a task. All eight snippets expand with real editor
+tabstops and four-space defaults. The regex/action suite tests Enter rules;
+live Enter automation remains unverified because typing commands produced no
+document edits in this host. The optional `IRIS_EDITING_ENTER=1` case retains
+that check rather than reporting it as a pass. No screenshot QA was performed.
+
+With `IRIS_TEST_EXECUTABLE` pointing to the existing sibling `iris` binary, the
+host test formats arithmetic/conditional and loop fixtures and executes original
+and formatted files in isolated temporary directories. Both versions match
+independent expected stdout, empty stderr, and zero exit status. Each CLI run is
+bounded to ten seconds. Without that variable, runtime equivalence is explicitly
+reported as skipped. The language source tree is not modified or rebuilt.
+
+The formatter is indentation-only, with conservative whole-document skips and
+bounded input/output/nesting. It preserves inline bytes and physical newlines;
+it does not establish complete syntax validity or reformat literal interiors.

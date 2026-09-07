@@ -12,7 +12,26 @@ reserved for Content-Length-framed JSON-RPC; startup failures use stderr.
   documents are ignored. Ranged edits are rejected without mutating text.
 - Keyword completion uses the shared `language/keywords.json` at build time.
 - Lexer-only diagnostics on open/change; empty publication on fix or close.
+- Document formatting through `iris-formatter`, using current unsaved text.
 - No parser, semantic analysis, evaluation, or code execution.
+- Full-document indentation formatting via `iris-formatter`, using the latest
+  synchronized buffer and a UTF-16 full-document edit. Unchanged, unknown, closed
+  or conservatively skipped documents return no edits; invalid options return
+  `InvalidParams`. See `../formatter/README.md` for preservation rules and limits.
+
+## Formatting
+
+`documentFormattingProvider` is advertised at initialization. A
+`textDocument/formatting` request accepts `tabSize` from 1 through 16 and a
+boolean `insertSpaces`. Invalid options or parameters return JSON-RPC `-32602`.
+Changed documents receive one whole-document edit whose range uses the original
+text's UTF-16 end position. Unknown/closed documents, unchanged text, and safety
+skips return `[]`. Requests never modify the in-memory document; the client must
+apply the edit and synchronize it normally. Equal/stale versions remain ignored.
+
+This formats indentation only, preserving inline spacing, comments, literals,
+and existing line endings. See `../formatter/README.md` for safety skips and
+resource limits. Protocol regressions live in `tests/formatting.rs`.
 
 ## Diagnostic Location Audit
 
@@ -49,6 +68,7 @@ require re-auditing this allowlist; regression tests exercise all seven codes.
 ```sh
 cargo test --workspace
 cargo fmt --package iris-lsp -- --check
+cargo fmt --package iris-formatter -- --check
 cargo clippy --workspace --all-targets -- -D warnings
 cargo build --workspace
 ```
