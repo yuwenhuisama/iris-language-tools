@@ -14,7 +14,7 @@
     "languages": [{ "id": "iris", "aliases": ["Iris", "iris"], "extensions": [".iris"], "configuration": "./language-configuration.json" }],
     "grammars": [{ "language": "iris", "scopeName": "source.iris", "path": "./syntaxes/iris.tmLanguage.json" }],
     "snippets": [{ "language": "iris", "path": "./snippets/iris.json" }],
-    "configurationDefaults": { "[iris]": { "editor.tabSize": 4, "editor.insertSpaces": true } },
+    "configurationDefaults": { "[iris]": { "editor.tabSize": 2, "editor.insertSpaces": true } },
     "commands": [{ "command": "iris.runFile", "title": "Iris: Run File on VM", "enablement": "isWorkspaceTrusted && editorLangId == iris && resourceScheme == file" }],
     "configuration": {
       "title": "Iris",

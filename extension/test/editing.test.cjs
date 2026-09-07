@@ -25,7 +25,7 @@ function expand(body) {
 if (process.env.IRIS_EDITING_HOST !== '1') {
   test('uses overridable Iris-only spaces when language defaults are contributed', () => {
     const defaults = manifest.contributes.configurationDefaults;
-    assert.deepEqual(defaults, { '[iris]': { 'editor.tabSize': 4, 'editor.insertSpaces': true } });
+    assert.deepEqual(defaults, { '[iris]': { 'editor.tabSize': 2, 'editor.insertSpaces': true } });
   });
 
   for (const [before, after] of [
@@ -123,10 +123,10 @@ exports.run = async function () {
   const vscode = require('vscode');
   if (process.env.IRIS_EDITING_ENTER === '1') {
     for (const [fixture, expected] of [
-      ['if true {|}', 'if true {\n    \n}'],
-      ['let values = %{|}', 'let values = %{\n    \n}'],
-      ['send(|)', 'send(\n    \n)'],
-      ['let values = [|]', 'let values = [\n    \n]'],
+      ['if true {|}', 'if true {\n  \n}'],
+      ['let values = %{|}', 'let values = %{\n  \n}'],
+      ['send(|)', 'send(\n  \n)'],
+      ['let values = [|]', 'let values = [\n  \n]'],
       ['// {|}', '// {\n}'],
       ['let text = "{|}"', 'let text = "{\n}"'],
       ['let text = r#"{|}"#', 'let text = r#"{\n}"#'],
@@ -154,11 +154,11 @@ exports.run = async function () {
   for (const snippet of Object.values(snippets())) {
     const document = await vscode.workspace.openTextDocument({ language: 'iris', content: '' });
     const editor = await vscode.window.showTextDocument(document);
-    assert.equal(editor.options.tabSize, 4);
+    assert.equal(editor.options.tabSize, 2);
     assert.equal(editor.options.insertSpaces, true);
     await editor.insertSnippet(new vscode.SnippetString(snippet.body.join('\n')));
-    assert.equal(document.getText(), expand(snippet.body).replaceAll('\t', '    '), snippet.prefix);
+    assert.equal(document.getText(), expand(snippet.body).replaceAll('\t', '  '), snippet.prefix);
     await vscode.commands.executeCommand('leaveSnippet');
   }
-  console.log('PASS: real editor four-space defaults and all eight snippet expansions');
+  console.log('PASS: real editor two-space defaults and all eight snippet expansions');
 };

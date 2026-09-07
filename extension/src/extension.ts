@@ -13,6 +13,18 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   client = new LanguageClient("iris", "Iris Language Server", { command }, {
     documentSelector: [{ scheme: "file", language: "iris" }, { scheme: "untitled", language: "iris" }],
     outputChannel: output,
+    middleware: {
+      provideDocumentFormattingEdits: async (document, options, token, next) => {
+        const edits = await next(document, options, token);
+        if (!edits?.length) return edits;
+        if (edits.some(edit => edit.newText.includes("\r"))) {
+          output.appendLine("Formatting skipped: this editor cannot normalize exterior line endings without changing protected content.");
+          return [];
+        }
+        if (document.eol === vscode.EndOfLine.LF) return edits;
+        return [...edits, vscode.TextEdit.setEndOfLine(vscode.EndOfLine.LF)];
+      },
+    },
   });
   try {
     await client.start();
