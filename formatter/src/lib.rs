@@ -1,42 +1,27 @@
 mod layout;
+mod normalize;
+mod normalize_expression;
+#[cfg(test)]
+mod normalize_tests;
+mod preflight;
 mod safety;
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct FormatOptions {
-    tab_size: u8,
-    insert_spaces: bool,
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct InvalidTabSize(pub u32);
-
-impl FormatOptions {
-    /// Constructs indentation options.
-    ///
-    /// # Errors
-    /// Returns `InvalidTabSize` unless `tab_size` is between 1 and 16.
-    pub fn new(tab_size: u32, insert_spaces: bool) -> Result<Self, InvalidTabSize> {
-        if !(1..=16).contains(&tab_size) {
-            return Err(InvalidTabSize(tab_size));
-        }
-        Ok(Self {
-            tab_size: u8::try_from(tab_size).map_err(|_| InvalidTabSize(tab_size))?,
-            insert_spaces,
-        })
-    }
-}
+mod spacing;
+mod tokens;
+mod tree;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SkipReason {
     InputLimit,
     OutputLimit,
     NestingLimit,
-    UnsupportedLiteral,
     Continuation,
     LexicalDiagnostics,
     MismatchedDelimiter,
     UnclosedDelimiter,
     UncertainProtectedRange,
+    ParseDiagnostics,
+    CandidateParseDiagnostics,
+    SemanticMismatch,
     TokenMismatch,
 }
 
@@ -47,25 +32,33 @@ pub enum FormatOutcome {
     Skipped(SkipReason),
 }
 
+/// Formats Iris with the fixed official two-space, 120-column style.
 #[must_use]
-pub fn format_document(source: &str, options: FormatOptions) -> FormatOutcome {
-    match format_checked(source, options) {
+pub fn format_document(source: &str) -> FormatOutcome {
+    match format_checked(source) {
         Ok(output) if output == source => FormatOutcome::Unchanged,
         Ok(output) => FormatOutcome::Changed(output),
         Err(reason) => FormatOutcome::Skipped(reason),
     }
 }
 
-fn format_checked(source: &str, options: FormatOptions) -> Result<String, SkipReason> {
+fn format_checked(source: &str) -> Result<String, SkipReason> {
     safety::check_source(source)?;
-    let lexed = iris_lexer::lex(source.as_bytes());
-    if !lexed.is_clean() {
-        return Err(SkipReason::LexicalDiagnostics);
+    let pieces = tokens::scan(source)?;
+    let tree = tree::build(&pieces)?;
+    preflight::syntax(&tree)?;
+    let original = iris_parser::parse(source);
+    if !original.is_clean() || !original.program_accepted {
+        return Err(SkipReason::ParseDiagnostics);
     }
-    let (output, mapped) = layout::indent(source, lexed.tokens(), options)?;
-    let checked = iris_lexer::lex(output.as_bytes());
-    if !checked.is_clean() || checked.tokens() != mapped {
-        return Err(SkipReason::TokenMismatch);
+    let output = layout::render(&tree)?;
+    let candidate = iris_parser::parse(&output);
+    if !candidate.is_clean() || !candidate.program_accepted {
+        return Err(SkipReason::CandidateParseDiagnostics);
     }
+    if normalize::program(original.program) != normalize::program(candidate.program) {
+        return Err(SkipReason::SemanticMismatch);
+    }
+    tokens::verify(&pieces, &tokens::scan(&output)?)?;
     Ok(output)
 }

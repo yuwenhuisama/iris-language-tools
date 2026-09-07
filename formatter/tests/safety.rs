@@ -1,16 +1,7 @@
-use iris_formatter::{FormatOptions, FormatOutcome, InvalidTabSize, SkipReason, format_document};
+use iris_formatter::{FormatOutcome, SkipReason, format_document};
 
 #[test]
-fn rejects_options_when_tab_size_is_outside_bounds() {
-    for tab_size in [0, 17, u32::MAX] {
-        let actual = FormatOptions::new(tab_size, true);
-
-        assert_eq!(actual, Err(InvalidTabSize(tab_size)));
-    }
-}
-
-#[test]
-fn skips_literals_when_protected_spans_are_ambiguous() {
+fn preserves_literal_bytes_when_every_supported_literal_family_occurs() {
     for literal in [
         "r\"raw\"",
         "r#\"raw\"#",
@@ -21,46 +12,54 @@ fn skips_literals_when_protected_spans_are_ambiguous() {
         "'''triple'''",
         "\"${value}\"",
         "m\"${value}\"",
-        "\"\"\"\n  body\n  \"\"\"",
+        "\"\"\"\r\n  body\r\n  \"\"\"",
+        "/[{}()]+/im",
+        "\"} [ ( // /*\"",
+        "b\"hi\"",
+        "m\"text\"",
+        "mb\"data\"",
+        "'\"'",
+        "\"\\\"}\"",
+        "0x1.fp3f32",
     ] {
-        let source = format!("fun f() {{\nlet text = {literal}\n}}");
-
-        let actual = format_document(&source, FormatOptions::new(2, true).unwrap());
-
+        let source = format!("fun f(){{let text={literal};}}");
+        let expected = format!("fun f() {{\n  let text = {literal}\n}}\n");
         assert_eq!(
-            actual,
-            FormatOutcome::Skipped(SkipReason::UnsupportedLiteral),
+            format_document(&source),
+            FormatOutcome::Changed(expected.clone()),
+            "{literal}"
+        );
+        assert_eq!(
+            format_document(&expected),
+            FormatOutcome::Unchanged,
             "{literal}"
         );
     }
 }
 
 #[test]
-fn skips_continuations_when_newline_is_escaped() {
+fn skips_continuations_when_newline_is_escaped_outside_literals() {
     for newline in ["\n", "\r\n", "\r"] {
         let source = format!("fun f() {{\n1 + \\{newline}2\n}}");
-
-        let actual = format_document(&source, FormatOptions::new(2, true).unwrap());
-
-        assert_eq!(actual, FormatOutcome::Skipped(SkipReason::Continuation));
+        assert_eq!(
+            format_document(&source),
+            FormatOutcome::Skipped(SkipReason::Continuation)
+        );
     }
 }
 
 #[test]
 fn skips_source_when_lexer_reports_diagnostics() {
     for source in [
-        "fun f() {\n1__0\n}",
+        "fun f(){1__0}",
         "/* open",
         "\"unclosed",
         "let bad = \\",
         "\"\\q\"",
         "\u{200b}",
-        "fun f() {\nprint(1+2)\n}",
     ] {
-        let actual = format_document(source, FormatOptions::new(2, true).unwrap());
-
         assert_eq!(
-            actual,
+            format_document(source),
             FormatOutcome::Skipped(SkipReason::LexicalDiagnostics),
             "{source}"
         );
@@ -70,10 +69,8 @@ fn skips_source_when_lexer_reports_diagnostics() {
 #[test]
 fn skips_source_when_delimiters_do_not_match() {
     for source in ["{\n)", "[\n}", "%{\n]", "(\n]", "}", "([)]"] {
-        let actual = format_document(source, FormatOptions::new(2, true).unwrap());
-
         assert_eq!(
-            actual,
+            format_document(source),
             FormatOutcome::Skipped(SkipReason::MismatchedDelimiter)
         );
     }
@@ -82,10 +79,8 @@ fn skips_source_when_delimiters_do_not_match() {
 #[test]
 fn skips_source_when_delimiters_remain_open() {
     for source in ["{\nprint(1)", "[", "%{", "("] {
-        let actual = format_document(source, FormatOptions::new(2, true).unwrap());
-
         assert_eq!(
-            actual,
+            format_document(source),
             FormatOutcome::Skipped(SkipReason::UnclosedDelimiter)
         );
     }
@@ -93,58 +88,72 @@ fn skips_source_when_delimiters_remain_open() {
 
 #[test]
 fn skips_input_when_byte_budget_is_exceeded() {
-    let source = " ".repeat(256 * 1024 + 1);
-
-    let actual = format_document(&source, FormatOptions::new(2, true).unwrap());
-
-    assert_eq!(actual, FormatOutcome::Skipped(SkipReason::InputLimit));
+    assert_eq!(
+        format_document(&" ".repeat(256 * 1024 + 1)),
+        FormatOutcome::Skipped(SkipReason::InputLimit)
+    );
 }
 
 #[test]
 fn accepts_input_when_byte_budget_is_exact() {
-    let source = " ".repeat(256 * 1024);
-
-    let actual = format_document(&source, FormatOptions::new(2, true).unwrap());
-
-    assert_eq!(actual, FormatOutcome::Unchanged);
+    assert_eq!(
+        format_document(&" ".repeat(256 * 1024)),
+        FormatOutcome::Changed(String::new())
+    );
 }
 
 #[test]
 fn skips_nesting_when_stack_budget_is_exceeded() {
     let source = format!("{}{}", "(".repeat(129), ")".repeat(129));
-
-    let actual = format_document(&source, FormatOptions::new(2, true).unwrap());
-
-    assert_eq!(actual, FormatOutcome::Skipped(SkipReason::NestingLimit));
-}
-
-#[test]
-fn accepts_nesting_when_stack_budget_is_exact() {
-    let source = format!("{}\nx\n{}", "(".repeat(128), ")".repeat(128));
-
-    let actual = format_document(&source, FormatOptions::new(1, false).unwrap());
-
     assert_eq!(
-        actual,
-        FormatOutcome::Changed(format!(
-            "{}\n{}x\n{}",
-            "(".repeat(128),
-            "\t".repeat(128),
-            ")".repeat(128)
-        ))
+        format_document(&source),
+        FormatOutcome::Skipped(SkipReason::NestingLimit)
     );
 }
 
 #[test]
-fn skips_output_when_indentation_expansion_exceeds_budget() {
-    let source = format!(
-        "{}\n{}{}",
-        "{".repeat(128),
-        "x\n".repeat(600),
-        "}".repeat(128)
+fn declines_parser_resource_limit_when_delimiter_budget_is_exact() {
+    let source = format!("{}x{}", "(".repeat(128), ")".repeat(128));
+    assert_eq!(
+        format_document(&source),
+        FormatOutcome::Skipped(SkipReason::ParseDiagnostics)
     );
+}
 
-    let actual = format_document(&source, FormatOptions::new(16, true).unwrap());
+#[test]
+fn rejects_malformed_syntax_when_tokens_are_lexically_clean() {
+    for source in [
+        ";print(1)",
+        "let = 1",
+        "fun f(,){}",
+        "let f={|x| x}",
+        "if ready {} else",
+        "x;;y",
+    ] {
+        assert_eq!(
+            format_document(source),
+            FormatOutcome::Skipped(SkipReason::ParseDiagnostics),
+            "{source}"
+        );
+    }
+}
 
-    assert_eq!(actual, FormatOutcome::Skipped(SkipReason::OutputLimit));
+#[test]
+fn preserves_newline_meaning_when_calls_symbols_and_arrays_are_adjacent() {
+    for source in [
+        "fun f(){return\n1}",
+        "let a = [1]\n[2]",
+        "f(x: :a)",
+        "obj.+(1)",
+        "property fun ready?=(v: Bool) {}",
+    ] {
+        let outcome = format_document(source);
+        assert!(
+            !matches!(outcome, FormatOutcome::Skipped(_)),
+            "{source}: {outcome:?}"
+        );
+        if let FormatOutcome::Changed(output) = outcome {
+            assert_eq!(format_document(&output), FormatOutcome::Unchanged);
+        }
+    }
 }

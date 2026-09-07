@@ -117,6 +117,8 @@ name = "iris-formatter"
 version = "0.1.0"
 dependencies = [
  "iris-lexer",
+ "iris-parser",
+ "iris-syntax",
 ]
 
 [[package]]
@@ -139,6 +141,19 @@ dependencies = [
  "serde_json",
  "wait-timeout",
 ]
+
+[[package]]
+name = "iris-parser"
+version = "0.1.0"
+dependencies = [
+ "icu_properties",
+ "iris-lexer",
+ "iris-syntax",
+]
+
+[[package]]
+name = "iris-syntax"
+version = "0.1.0"
 
 [[package]]
 name = "itoa"
