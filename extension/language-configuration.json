@@ -8,5 +8,50 @@
     { "open": "\"", "close": "\"", "notIn": ["string", "comment"] },
     { "open": "'", "close": "'", "notIn": ["string", "comment"] }
   ],
-  "surroundingPairs": [["{", "}"], ["[", "]"], ["(", ")"], ["\"", "\""], ["'", "'"]]
+  "surroundingPairs": [["{", "}"], ["[", "]"], ["(", ")"], ["\"", "\""], ["'", "'"]],
+  "indentationRules": {
+    "increaseIndentPattern": "^(?!.*[\"'/#\\\\])(?!\\s*\\*)[^{}]*[({\\[]\\s*$",
+    "decreaseIndentPattern": "^\\s*[})\\]]+[;,]?\\s*$",
+    "unIndentedLinePattern": "^.*[\"'/#\\\\].*$|^\\s*\\*.*$"
+  },
+  "onEnterRules": [
+    {
+      "beforeText": "^.*$",
+      "previousLineText": "[\"'/#\\\\]|^\\s*\\*",
+      "action": { "indent": "none" }
+    },
+    {
+      "beforeText": "[\"'/#\\\\]|^\\s*\\*",
+      "action": { "indent": "none" }
+    },
+    {
+      "beforeText": "^.*$",
+      "afterText": "[\"'/#\\\\]",
+      "action": { "indent": "none" }
+    },
+    {
+      "beforeText": "^[^{}]*\\{\\s*$",
+      "afterText": "^\\s*\\}[})\\]]*[;,]?\\s*$",
+      "action": { "indent": "indentOutdent" }
+    },
+    {
+      "beforeText": "^[^{}]*\\(\\s*$",
+      "afterText": "^\\s*\\)[})\\]]*[;,]?\\s*$",
+      "action": { "indent": "indentOutdent" }
+    },
+    {
+      "beforeText": "^[^{}]*\\[\\s*$",
+      "afterText": "^\\s*\\][})\\]]*[;,]?\\s*$",
+      "action": { "indent": "indentOutdent" }
+    },
+    {
+      "beforeText": "^[^{}]*[({\\[]\\s*$",
+      "afterText": "^\\s*$",
+      "action": { "indent": "indent" }
+    },
+    {
+      "beforeText": "^.*$",
+      "action": { "indent": "none" }
+    }
+  ]
 }
