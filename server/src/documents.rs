@@ -1,10 +1,12 @@
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use lsp_types::{DidChangeTextDocumentParams, TextDocumentItem, Uri};
 
 pub struct Document {
     pub(crate) text: String,
     pub(crate) version: i32,
+    pub(crate) generation: Arc<()>,
 }
 
 #[derive(Default)]
@@ -26,6 +28,7 @@ impl Documents {
             Document {
                 text: item.text,
                 version: item.version,
+                generation: Arc::new(()),
             },
         );
         Some(uri)
@@ -122,5 +125,24 @@ mod tests {
         let (mut documents, uri) = opened();
         let removed = documents.close(&uri);
         assert_eq!(removed.unwrap().text, "current");
+    }
+
+    #[test]
+    fn replaces_generation_when_same_uri_and_version_are_reopened() {
+        let (mut documents, uri) = opened();
+        let generation = std::sync::Arc::clone(&documents.get(&uri).unwrap().generation);
+        documents.close(&uri);
+
+        documents.open(TextDocumentItem::new(
+            uri.clone(),
+            "iris".into(),
+            4,
+            "current".into(),
+        ));
+
+        assert!(!std::sync::Arc::ptr_eq(
+            &generation,
+            &documents.get(&uri).unwrap().generation
+        ));
     }
 }

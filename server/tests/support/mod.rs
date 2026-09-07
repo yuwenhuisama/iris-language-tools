@@ -4,6 +4,7 @@ use std::cell::Cell;
 use std::io::{BufReader, Write};
 use std::process::{Child, ChildStdin, Command, Stdio};
 use std::sync::mpsc::{self, Receiver};
+use std::thread::JoinHandle;
 use std::time::Duration;
 use wait_timeout::ChildExt;
 
@@ -12,6 +13,7 @@ pub struct Client {
     input: ChildStdin,
     messages: Receiver<Message>,
     started: Cell<bool>,
+    reader: Option<JoinHandle<()>>,
 }
 
 impl Client {
@@ -25,7 +27,7 @@ impl Client {
         let input = child.stdin.take().unwrap();
         let output = child.stdout.take().unwrap();
         let (sender, messages) = mpsc::channel();
-        std::thread::spawn(move || {
+        let reader = std::thread::spawn(move || {
             let mut reader = BufReader::new(output);
             while let Some(message) = Message::read(&mut reader).unwrap() {
                 if sender.send(message).is_err() {
@@ -38,6 +40,7 @@ impl Client {
             input,
             messages,
             started: Cell::new(false),
+            reader: Some(reader),
         }
     }
 
@@ -57,6 +60,19 @@ impl Client {
             .unwrap();
         self.started.set(true);
         serde_json::to_value(message).unwrap()
+    }
+
+    pub fn response(&self) -> Value {
+        loop {
+            let message = self.messages.recv_timeout(Duration::from_secs(50)).unwrap();
+            match message {
+                Message::Response(response) => return serde_json::to_value(response).unwrap(),
+                Message::Notification(notification) => {
+                    assert_eq!(notification.method, "window/logMessage");
+                }
+                Message::Request(_) => panic!("unexpected server request"),
+            }
+        }
     }
 
     pub fn initialize(&mut self) -> Value {
@@ -95,6 +111,9 @@ impl Drop for Client {
         if !matches!(self.child.try_wait(), Ok(Some(_))) {
             self.child.kill().unwrap();
             self.child.wait().unwrap();
+        }
+        if let Some(reader) = self.reader.take() {
+            reader.join().unwrap();
         }
     }
 }

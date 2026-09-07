@@ -19,7 +19,7 @@ fn advertises_full_sync_and_keywords_when_initialized() {
         &json!({"jsonrpc":"2.0","id":2,"method":"textDocument/completion",
         "params":{"textDocument":{"uri":"untitled:one"},"position":{"line":0,"character":0}}}),
     );
-    let response = client.receive();
+    let response = client.response();
     let labels: Vec<_> = response["result"]
         .as_array()
         .unwrap()

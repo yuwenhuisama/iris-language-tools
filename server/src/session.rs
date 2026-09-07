@@ -1,4 +1,5 @@
 use std::process::ExitCode;
+use std::time::Duration;
 
 use lsp_server::{Connection, Message, Request, Response};
 use lsp_types::{
@@ -8,7 +9,12 @@ use lsp_types::{
 };
 use serde_json::json;
 
-use crate::{documents::Documents, formatting, notifications};
+use crate::{
+    documents::Documents,
+    formatting::Formatting,
+    notifications,
+    worker::{Budget, Program},
+};
 
 enum Phase {
     Initialize,
@@ -18,6 +24,14 @@ enum Phase {
 }
 
 pub fn run(connection: &Connection) -> anyhow::Result<ExitCode> {
+    run_with_worker(connection, Program::current()?, Budget::default())
+}
+
+pub fn run_with_worker(
+    connection: &Connection,
+    program: Program,
+    budget: Budget,
+) -> anyhow::Result<ExitCode> {
     let keywords: Vec<String> = serde_json::from_str(include_str!("../../language/keywords.json"))?;
     let completions: Vec<_> = keywords
         .into_iter()
@@ -29,7 +43,16 @@ pub fn run(connection: &Connection) -> anyhow::Result<ExitCode> {
         .collect();
     let mut phase = Phase::Initialize;
     let mut documents = Documents::default();
-    for message in &connection.receiver {
+    let mut formatting = Formatting::new(program, budget);
+    loop {
+        let message = match connection.receiver.recv_timeout(Duration::from_millis(10)) {
+            Ok(message) => message,
+            Err(error) if error.is_timeout() => {
+                formatting.poll(connection, &documents)?;
+                continue;
+            }
+            Err(_) => break,
+        };
         match message {
             Message::Request(request) => {
                 let response = match phase {
@@ -40,13 +63,18 @@ pub fn run(connection: &Connection) -> anyhow::Result<ExitCode> {
                         "awaiting initialized notification".into(),
                     ),
                     Phase::Running if request.method == "textDocument/formatting" => {
-                        formatting::respond(request, &documents)
+                        formatting.request(request, (connection, &documents))?;
+                        formatting.poll(connection, &documents)?;
+                        continue;
                     }
                     Phase::Running => respond(request, &completions, &mut phase),
                     Phase::Shutdown => {
                         Response::new_err(request.id, -32600, "server has shut down".into())
                     }
                 };
+                if matches!(phase, Phase::Shutdown) {
+                    formatting.stop(connection)?;
+                }
                 connection.sender.send(response.into())?;
             }
             Message::Notification(notification) => {
@@ -69,9 +97,12 @@ pub fn run(connection: &Connection) -> anyhow::Result<ExitCode> {
                     }
                     Phase::Running => {
                         let method = notification.method.clone();
-                        if let Err(error) =
+                        let result = if method == "$/cancelRequest" {
+                            formatting.cancel(connection, notification.params)
+                        } else {
                             notifications::handle(connection, &mut documents, notification)
-                        {
+                        };
+                        if let Err(error) = result {
                             notifications::log(
                                 connection,
                                 json!({"event":"notification.rejected",
@@ -85,6 +116,7 @@ pub fn run(connection: &Connection) -> anyhow::Result<ExitCode> {
             }
             Message::Response(_) => {}
         }
+        formatting.poll(connection, &documents)?;
     }
     Ok(ExitCode::FAILURE)
 }

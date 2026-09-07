@@ -10,7 +10,7 @@ fn request(client: &mut Client, options: Value) -> Value {
         "params":{"textDocument":{"uri":URI}}});
     message["params"]["options"] = options;
     client.send(&message);
-    client.receive()
+    client.response()
 }
 
 #[test]
@@ -51,7 +51,7 @@ fn formats_latest_unsaved_text_when_stale_and_equal_changes_follow() {
         response["result"],
         json!([{"range":{
         "start":{"line":0,"character":0},"end":{"line":2,"character":1}},
-        "newText":"fun latest() {\n  print(2)\n}"}])
+        "newText":"fun latest() {\n  print(2)\n}\n"}])
     );
     client.shutdown();
 }
@@ -71,13 +71,13 @@ fn maps_original_utf16_end_when_source_has_unicode_and_crlf() {
         response["result"],
         json!([{"range":{
         "start":{"line":0,"character":0},"end":{"line":2,"character":7}},
-        "newText":"\u{feff}fun f() {\r\n  print(\"\u{1f600}\")\r\n} // \u{1f600}"}])
+        "newText":"fun f() {\n  print(\"\u{1f600}\")\n}  // \u{1f600}\n"}])
     );
     client.shutdown();
 }
 
 #[test]
-fn inserts_tabs_when_spaces_are_disabled() {
+fn uses_official_spaces_when_editor_options_conflict() {
     let mut client = Client::spawn();
     client.initialize();
     client.open(URI, "fun f() {\rprint(\n1\r\n)\r}\r\n");
@@ -88,7 +88,7 @@ fn inserts_tabs_when_spaces_are_disabled() {
         response["result"],
         json!([{"range":{
         "start":{"line":0,"character":0},"end":{"line":5,"character":0}},
-        "newText":"fun f() {\r\tprint(\n\t\t1\r\n\t)\r}\r\n"}])
+        "newText":"fun f() {\n  print(\n    1,\n  )\n}\n"}])
     );
     client.shutdown();
 }
@@ -97,7 +97,7 @@ fn inserts_tabs_when_spaces_are_disabled() {
 fn returns_empty_when_document_is_unknown_closed_or_unchanged() {
     let mut client = Client::spawn();
     client.initialize();
-    for text in [None, Some("fun f() {\n  print(1)\n}")] {
+    for text in [None, Some("fun f() {\n  print(1)\n}\n")] {
         if let Some(text) = text {
             client.open(URI, text);
         }
@@ -167,7 +167,7 @@ fn stays_responsive_when_invalid_or_incomplete_source_is_skipped() {
         "fun f() {\nprint(1)",
         "fun f() {\n]\n}",
         "fun f() {\n\\\n}",
-        "fun f() {\nlet s = r\"x\"\n}",
+        "fun f() {\nlet = 1\n}",
     ] {
         client.open(URI, source);
 
@@ -182,7 +182,10 @@ fn stays_responsive_when_invalid_or_incomplete_source_is_skipped() {
 
     let response = request(&mut client, json!({"tabSize":2,"insertSpaces":true}));
 
-    assert_eq!(response["result"][0]["newText"], "fun f() {\n  print(1)\n}");
+    assert_eq!(
+        response["result"][0]["newText"],
+        "fun f() {\n  print(1)\n}\n"
+    );
     client.shutdown();
 }
 
@@ -195,7 +198,25 @@ fn preserves_document_when_formatting_is_requested_twice_without_applying_edits(
 
     let second = request(&mut client, json!({"tabSize":2,"insertSpaces":true}));
 
-    assert_eq!(first["result"][0]["newText"], "fun f() {\n  print(1)\n}");
+    assert_eq!(first["result"][0]["newText"], "fun f() {\n  print(1)\n}\n");
     assert_eq!(second, first);
+    client.shutdown();
+}
+
+#[test]
+fn expands_methods_semicolons_else_and_lists_when_official_style_is_requested() {
+    let mut client = Client::spawn();
+    client.initialize();
+    client.open(
+        URI,
+        "fun f(){let values=[\n1,\n2\n];if ready {print(values);}else{print(0);}}",
+    );
+
+    let response = request(&mut client, json!({"tabSize":8,"insertSpaces":false}));
+
+    assert_eq!(
+        response["result"][0]["newText"],
+        "fun f() {\n  let values = [\n    1,\n    2,\n  ]\n  if ready {\n    print(values)\n  }\n  else {\n    print(0)\n  }\n}\n"
+    );
     client.shutdown();
 }
