@@ -8,6 +8,7 @@ const bundle = buildSync({ entryPoints: [path.join(__dirname, '../src/run-file.t
 
 function scenario(overrides = {}) {
   const tasks = [];
+  const warnings = [];
   let saves = 0;
   const document = {
     languageId: 'iris', uri: { scheme: 'file', fsPath: '/tmp/project with spaces/hello.iris' },
@@ -15,8 +16,8 @@ function scenario(overrides = {}) {
     ...overrides.document,
   };
   const api = {
-    workspace: { isTrusted: overrides.trusted ?? true, getConfiguration: () => ({ get: () => '/tmp/iris tools/iris' }) },
-    window: { activeTextEditor: { document }, showWarningMessage: async () => {} },
+    workspace: { isTrusted: overrides.trusted ?? true, workspaceFolders: Object.hasOwn(overrides, 'folders') ? overrides.folders : [{ name: 'project' }], getConfiguration: () => ({ get: () => '/tmp/iris tools/iris' }) },
+    window: { activeTextEditor: { document }, showWarningMessage: async message => { warnings.push(message); } },
     TaskScope: { Workspace: 2 },
     ProcessExecution: class { constructor(command, args, options) { Object.assign(this, { command, args, options }); } },
     Task: class { constructor(definition, scope, name, source, execution) { Object.assign(this, { definition, scope, name, source, execution }); } },
@@ -24,7 +25,7 @@ function scenario(overrides = {}) {
   };
   const module = { exports: {} };
   vm.runInNewContext(bundle, { module, exports: module.exports, require: name => name === 'vscode' ? api : require(name) });
-  return { run: module.exports.runFile, tasks, saves: () => saves };
+  return { run: module.exports.runFile, tasks, warnings, saves: () => saves };
 }
 
 test('runs saved content with separate executable and VM arguments containing spaces', async () => {
@@ -63,3 +64,13 @@ test('runs clean files without a save operation', async () => {
   assert.equal(input.saves(), 0);
   assert.equal(input.tasks.length, 1);
 });
+
+for (const folders of [undefined, []]) {
+  test(`does not save or launch tasks when workspace folders are ${JSON.stringify(folders)}`, async () => {
+    const input = scenario({ folders });
+    await input.run();
+    assert.equal(input.saves(), 0);
+    assert.equal(input.tasks.length, 0);
+    assert.equal(input.warnings.length, 1);
+  });
+}
