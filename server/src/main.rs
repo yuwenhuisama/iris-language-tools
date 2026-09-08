@@ -12,6 +12,7 @@ mod semantic_query;
 mod semantic_worker;
 mod semantics;
 mod session;
+mod signature_help;
 mod worker;
 mod worker_protocol;
 mod workspace;

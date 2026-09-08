@@ -11,6 +11,7 @@ fn coordinator(worker: SemanticWorker) -> Semantics {
         next_ticket: 0,
         roots: Vec::new(),
         hover_format: crate::hover::Format::default(),
+        signature_options: crate::signature_help::Options::default(),
         inputs: None,
     }
 }

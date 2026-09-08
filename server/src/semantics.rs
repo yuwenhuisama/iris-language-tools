@@ -27,6 +27,10 @@ mod tests;
 #[path = "hover_lifecycle_tests.rs"]
 mod hover_tests;
 
+#[cfg(test)]
+#[path = "signature_lifecycle_tests.rs"]
+mod signature_tests;
+
 struct Pending {
     ticket: Ticket,
     id: Option<RequestId>,
@@ -56,6 +60,7 @@ pub struct Semantics {
     next_ticket: u64,
     pub roots: Vec<Uri>,
     pub hover_format: crate::hover::Format,
+    pub signature_options: crate::signature_help::Options,
     inputs: Option<Arc<Inputs>>,
 }
 
@@ -68,6 +73,7 @@ impl Semantics {
             next_ticket: 0,
             roots: Vec::new(),
             hover_format: crate::hover::Format::default(),
+            signature_options: crate::signature_help::Options::default(),
             inputs: None,
         })
     }
@@ -89,7 +95,11 @@ impl Semantics {
         context: (&Connection, &Documents),
     ) -> anyhow::Result<()> {
         let (connection, documents) = context;
-        let query = match Query::decode(&request.method, request.params, self.hover_format) {
+        let query = match Query::decode(
+            &request.method,
+            request.params,
+            (self.hover_format, self.signature_options),
+        ) {
             Ok(query) => query,
             Err(error) => {
                 connection
@@ -241,28 +251,6 @@ impl Semantics {
             pending.finish_error(connection, (-32800, "semantic request cancelled"))?;
         }
         self.worker.stop();
-        Ok(())
-    }
-}
-
-impl Drop for Semantics {
-    fn drop(&mut self) {
-        for pending in &self.pending {
-            pending.cancelled.store(true, Ordering::Relaxed);
-        }
-        self.worker.stop();
-    }
-}
-
-impl Pending {
-    fn finish_error(&mut self, connection: &Connection, error: (i32, &str)) -> anyhow::Result<()> {
-        let (code, message) = error;
-        self.cancelled.store(true, Ordering::Relaxed);
-        if let Some(id) = self.id.take() {
-            connection
-                .sender
-                .send(Response::new_err(id, code, message.into()).into())?;
-        }
         Ok(())
     }
 }

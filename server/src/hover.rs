@@ -1,5 +1,9 @@
-use iris_analysis::HoverInfo;
+use iris_analysis::{DocumentationInfo, HoverDetail, HoverInfo, HoverKind, ParameterCategory};
 use lsp_types::{ClientCapabilities, MarkupContent, MarkupKind};
+
+#[path = "markup.rs"]
+mod markup;
+use markup::Card;
 
 #[cfg(test)]
 #[path = "hover_tests.rs"]
@@ -31,36 +35,61 @@ impl Format {
 }
 
 pub fn render(info: &HoverInfo, format: Format) -> MarkupContent {
-    let label = info
-        .type_label
-        .as_deref()
-        .filter(|label| !label.is_empty() && !info.signature.contains(label));
-    let parts = [
-        info.signature.as_str(),
-        label.map_or("", |_| "\n\nType: "),
-        label.unwrap_or(""),
-    ];
-    let mut value = String::with_capacity(MAX_BYTES);
-    for scalar in parts.into_iter().flat_map(str::chars) {
-        let escape = match format {
-            Format::Markdown => scalar.is_ascii_punctuation(),
-            Format::Plaintext => false,
-        };
-        let extra = usize::from(escape);
-        if value.len() + scalar.len_utf8() + extra > MAX_BYTES - 3 {
-            value.push_str("...");
-            break;
-        }
-        if escape {
-            value.push('\\');
-        }
-        value.push(scalar);
+    let mut card = Card::new(format);
+    card.signature(&info.signature);
+    if info.details.is_empty()
+        && let Some(label) = info.type_label.as_deref()
+        && !label.is_empty()
+        && !info.signature.contains(label)
+    {
+        card.field("Type", label);
     }
-    MarkupContent {
-        kind: match format {
-            Format::Markdown => MarkupKind::Markdown,
-            Format::Plaintext => MarkupKind::PlainText,
-        },
-        value,
+    card.field("Kind", kind_label(info.kind));
+    if let Some(owner) = &info.owner {
+        card.field("Owner", owner);
+    }
+    for detail in &info.details {
+        match detail {
+            HoverDetail::ReturnType(label) => card.field("Declared return", label),
+            HoverDetail::ValueType(label) => card.field("Type", label),
+            HoverDetail::ParameterCategory(category) => card.field(
+                "Parameter",
+                match category {
+                    ParameterCategory::Positional => "Positional",
+                    ParameterCategory::Rest => "Rest",
+                    ParameterCategory::Keyword => "Keyword",
+                    ParameterCategory::KeywordRest => "Keyword rest",
+                    ParameterCategory::Block => "Block",
+                },
+            ),
+        }
+    }
+    if let Some(docs) = &info.docs {
+        card.documentation(docs);
+    }
+    card.finish()
+}
+
+pub fn render_docs(docs: &DocumentationInfo, format: Format) -> MarkupContent {
+    let mut card = Card::new(format);
+    card.literal(&docs.text, docs.truncated);
+    card.finish()
+}
+
+const fn kind_label(kind: HoverKind) -> &'static str {
+    match kind {
+        HoverKind::Class => "Class",
+        HoverKind::Module => "Module",
+        HoverKind::Contract => "Contract",
+        HoverKind::TypeAlias => "Type alias",
+        HoverKind::Binding => "Variable",
+        HoverKind::Constant => "Constant",
+        HoverKind::Global => "Global",
+        HoverKind::Shared => "Shared",
+        HoverKind::Property => "Property",
+        HoverKind::Method => "Method",
+        HoverKind::Parameter => "Parameter",
+        HoverKind::TypeParameter => "Type parameter",
+        HoverKind::PatternBinding => "Pattern binding",
     }
 }

@@ -2,13 +2,14 @@ use iris_analysis::{AnalysisSnapshot, FileId, Span};
 use iris_lexer::ByteOffset;
 use lsp_types::{
     CompletionItem, CompletionParams, GotoDefinitionParams, HoverParams, InlayHintParams, Position,
-    Range, ReferenceParams, Uri,
+    Range, ReferenceParams, SignatureHelpParams, Uri,
 };
 use serde_json::{Value, json};
 
 use crate::{
     hover::{self, Format},
     positions::LineIndex,
+    signature_help::{self, Options},
     workspace::{InventoryDetails, Snapshot},
 };
 
@@ -22,6 +23,7 @@ pub enum Operation {
     Completion(Position),
     Hints(Range),
     Hover(Position, Format),
+    SignatureHelp(Position, Options),
 }
 
 #[derive(Clone, Debug)]
@@ -41,14 +43,26 @@ pub enum QueryError {
 }
 
 impl Query {
-    pub fn decode(method: &str, params: Value, format: Format) -> Result<Self, serde_json::Error> {
+    pub fn decode(
+        method: &str,
+        params: Value,
+        options: (Format, Options),
+    ) -> Result<Self, serde_json::Error> {
         match method {
+            "textDocument/signatureHelp" => {
+                let params: SignatureHelpParams = serde_json::from_value(params)?;
+                let position = params.text_document_position_params;
+                Ok(Self {
+                    uri: position.text_document.uri,
+                    operation: Operation::SignatureHelp(position.position, options.1),
+                })
+            }
             "textDocument/hover" => {
                 let params: HoverParams = serde_json::from_value(params)?;
                 let position = params.text_document_position_params;
                 Ok(Self {
                     uri: position.text_document.uri,
-                    operation: Operation::Hover(position.position, format),
+                    operation: Operation::Hover(position.position, options.0),
                 })
             }
             "textDocument/definition" => {
@@ -109,7 +123,7 @@ impl Query {
             }
             return Ok(match self.operation {
                 Operation::Completion(_) => json!(keywords),
-                Operation::Hover(_, _) => Value::Null,
+                Operation::Hover(_, _) | Operation::SignatureHelp(_, _) => Value::Null,
                 Operation::Definition(_) | Operation::References(_, _) | Operation::Hints(_) => {
                     json!([])
                 }
@@ -130,6 +144,11 @@ impl Query {
                 .ok_or(QueryError::Position)
         };
         match self.operation {
+            Operation::SignatureHelp(position, options) => Ok(json!(
+                analysis
+                    .signature_help(file, offset(position)?)
+                    .and_then(|info| signature_help::render(info, options))
+            )),
             Operation::Hover(position, format) => {
                 let Some(info) = analysis.hover(file, offset(position)?) else {
                     return Ok(Value::Null);
@@ -157,12 +176,11 @@ impl Query {
             }
             Operation::Completion(position) => {
                 let byte = offset(position)?;
-                let cursor = index
-                    .position(ByteOffset(byte))
-                    .ok_or(QueryError::Position)?;
                 completion::CompletionContext {
                     index: &index,
-                    cursor,
+                    cursor: index
+                        .position(ByteOffset(byte))
+                        .ok_or(QueryError::Position)?,
                     inventory_complete: snapshot.is_complete(),
                 }
                 .response(analysis.completions(file, byte), keywords)
@@ -214,52 +232,5 @@ fn span_range(index: &LineIndex<'_>, span: Span) -> Result<Range, QueryError> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::workspace::{
-        CoverageIssue, FileSource, GroupIdentity, IssueKind, Revision, SourceOrigin,
-    };
-    use iris_analysis::{GroupId, SourceInput};
-    use std::sync::Arc;
-
-    #[test]
-    fn marks_keyword_response_incomplete_when_workspace_inventory_is_partial() {
-        let uri: Uri = "untitled:keywords".parse().unwrap();
-        let text: Arc<str> = "let value = 1".into();
-        let snapshot = Snapshot {
-            revision: Revision(1),
-            files: vec![FileSource {
-                uri: uri.clone(),
-                text: Arc::clone(&text),
-                group: GroupIdentity::Standalone(uri.clone()),
-                origin: SourceOrigin::Disk,
-            }]
-            .into(),
-            issues: vec![CoverageIssue {
-                uri: None,
-                path: None,
-                kind: IssueKind::FileCount,
-            }]
-            .into(),
-        };
-        let analysis = AnalysisSnapshot::new([SourceInput {
-            id: FileId(0),
-            group: GroupId(0),
-            text,
-        }]);
-        let keywords = [CompletionItem {
-            label: "let".into(),
-            kind: Some(lsp_types::CompletionItemKind::KEYWORD),
-            ..CompletionItem::default()
-        }];
-        let query = Query {
-            uri,
-            operation: Operation::Completion(Position::new(0, 0)),
-        };
-
-        let when = query.execute((&snapshot, &analysis), &keywords).unwrap();
-
-        assert_eq!(when["isIncomplete"], true);
-        assert_eq!(when["items"], json!(keywords));
-    }
-}
+#[path = "semantic_query_tests.rs"]
+mod tests;

@@ -1,4 +1,4 @@
-use super::Semantics;
+use super::{Connection, Ordering, Pending, Response, Semantics};
 
 impl Semantics {
     pub fn notification(&mut self, notification: lsp_server::Notification) -> anyhow::Result<()> {
@@ -28,6 +28,32 @@ impl Semantics {
                 self.changed()?;
             }
             _ => {}
+        }
+        Ok(())
+    }
+}
+
+impl Drop for Semantics {
+    fn drop(&mut self) {
+        for pending in &self.pending {
+            pending.cancelled.store(true, Ordering::Relaxed);
+        }
+        self.worker.stop();
+    }
+}
+
+impl Pending {
+    pub(super) fn finish_error(
+        &mut self,
+        connection: &Connection,
+        error: (i32, &str),
+    ) -> anyhow::Result<()> {
+        let (code, message) = error;
+        self.cancelled.store(true, Ordering::Relaxed);
+        if let Some(id) = self.id.take() {
+            connection
+                .sender
+                .send(Response::new_err(id, code, message.into()).into())?;
         }
         Ok(())
     }

@@ -75,6 +75,7 @@ pub fn run_with_worker(
                             request.method.as_str(),
                             "textDocument/definition"
                                 | "textDocument/hover"
+                                | "textDocument/signatureHelp"
                                 | "textDocument/references"
                                 | "textDocument/completion"
                                 | "textDocument/inlayHint"
@@ -139,6 +140,8 @@ fn initialize(request: Request, phase: &mut Phase, semantics: &mut Semantics) ->
     match serde_json::from_value::<InitializeParams>(request.params.clone()) {
         Ok(params) => {
             semantics.hover_format = crate::hover::Format::negotiate(&params.capabilities);
+            semantics.signature_options =
+                crate::signature_help::Options::negotiate(&params.capabilities);
             semantics.roots = params.workspace_folders.map_or_else(
                 || {
                     request
@@ -169,6 +172,11 @@ fn initialize(request: Request, phase: &mut Phase, semantics: &mut Semantics) ->
                         }),
                         definition_provider: Some(lsp_types::OneOf::Left(true)),
                         hover_provider: Some(lsp_types::HoverProviderCapability::Simple(true)),
+                        signature_help_provider: Some(lsp_types::SignatureHelpOptions {
+                            trigger_characters: Some(vec!["(".into(), ",".into(), ":".into()]),
+                            retrigger_characters: Some(vec![")".into()]),
+                            ..lsp_types::SignatureHelpOptions::default()
+                        }),
                         references_provider: Some(lsp_types::OneOf::Left(true)),
                         inlay_hint_provider: Some(lsp_types::OneOf::Left(true)),
                         workspace: Some(lsp_types::WorkspaceServerCapabilities {

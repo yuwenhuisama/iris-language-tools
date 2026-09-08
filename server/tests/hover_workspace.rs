@@ -50,7 +50,7 @@ fn uses_caller_utf16_range_when_target_is_in_another_file() {
     assert_eq!(
         when,
         json!({"id":2,"result":{
-            "contents":{"kind":"plaintext","value":"class Box<T>"},
+            "contents":{"kind":"plaintext","value":"class Box<T>\n\nKind: Class"},
             "range":{"start":{"line":1,"character":7},"end":{"line":1,"character":10}}
         }})
     );
@@ -77,8 +77,11 @@ fn updates_known_return_when_dirty_target_changes() {
     given.open(&target, "class Box { public fun read() -> Integer { 1 } }");
     let source = uri(&root.join("main.iris"));
     assert_eq!(
-        hover(&mut given, &source, (0, 61))["result"]["contents"]["value"],
-        "let value: Integer"
+        hover(&mut given, &source, (0, 61)),
+        json!({"id":2,"result":{
+            "contents":{"kind":"plaintext","value":"let value: Integer\n\nKind: Variable\n\nOwner: Main\n\nType: Integer"},
+            "range":{"start":{"line":0,"character":61},"end":{"line":0,"character":66}}
+        }})
     );
     given.send(
         &json!({"jsonrpc":"2.0","method":"textDocument/didChange","params":{
@@ -89,7 +92,13 @@ fn updates_known_return_when_dirty_target_changes() {
 
     let when = hover(&mut given, &source, (0, 61));
 
-    assert_eq!(when["result"]["contents"]["value"], "let value: String");
+    assert_eq!(
+        when,
+        json!({"id":2,"result":{
+            "contents":{"kind":"plaintext","value":"let value: String\n\nKind: Variable\n\nOwner: Main\n\nType: String"},
+            "range":{"start":{"line":0,"character":61},"end":{"line":0,"character":66}}
+        }})
+    );
     given.shutdown();
 }
 
@@ -131,6 +140,12 @@ fn returns_local_hover_when_unrelated_inventory_is_partial() {
 
     let when = hover(&mut given, &uri(&root.join("main.iris")), (0, 29));
 
-    assert_eq!(when["result"]["contents"]["value"], "let value: Integer");
+    assert_eq!(
+        when,
+        json!({"id":2,"result":{
+            "contents":{"kind":"plaintext","value":"let value: Integer\n\nKind: Variable\n\nOwner: Main\n\nType: Integer"},
+            "range":{"start":{"line":0,"character":29},"end":{"line":0,"character":34}}
+        }})
+    );
     given.shutdown();
 }

@@ -36,7 +36,7 @@ fn returns_plaintext_use_range_when_client_capability_is_missing() {
     assert_eq!(
         when,
         json!({"id":2,"result":{
-            "contents":{"kind":"plaintext","value":"let value: Integer"},
+            "contents":{"kind":"plaintext","value":"let value: Integer\n\nKind: Variable\n\nOwner: Main\n\nType: Integer"},
             "range":{"start":{"line":2,"character":7},"end":{"line":2,"character":12}}
         }})
     );
@@ -49,10 +49,24 @@ fn resolves_headers_when_hovering_source_class_and_typed_method() {
     given.initialize();
     let text = "class Box { public fun read() -> Integer { 1 } }\nmodule Main { let item = Box.new(); item.read() }";
     given.open("untitled:hover", text);
-    for (column, signature) in [(25, "class Box"), (42, "public fun read() -> Integer")] {
+    for (column, start, end, content) in [
+        (25, 25, 28, "class Box\n\nKind: Class"),
+        (
+            42,
+            41,
+            45,
+            "public fun read() -> Integer\n\nKind: Method\n\nOwner: Box\n\nDeclared return: Integer",
+        ),
+    ] {
         let when = hover(&mut given, "untitled:hover", (1, column));
 
-        assert_eq!(when["result"]["contents"]["value"], signature, "{when}");
+        assert_eq!(
+            when,
+            json!({"id":2,"result":{
+                "contents":{"kind":"plaintext","value":content},
+                "range":{"start":{"line":1,"character":start},"end":{"line":1,"character":end}}
+            }})
+        );
     }
     given.shutdown();
 }
