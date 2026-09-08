@@ -3,7 +3,7 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 
 const caller = 'import Core as Alias\nmodule Main { let item = Alias::Thing.new(); let result = item.read(); item.re }';
-const original = 'module Core {} class Core::Thing { public fun read() -> Integer { 1 } }';
+const original = 'module Core {} class Core::Thing {\n/// Original docs\npublic fun read(value = 1) -> Integer { 1 } }';
 const manifest = sources => `manifest_version = 1\npackage_id = "org.example.semantic"\napi_major = 1\nversion = "1.0.0"\niris_major = 1\nsources = ${JSON.stringify(sources)}\nentry_modules = []\n[permissions]\nrequired = []\noptional = []\n`;
 
 exports.prepare = async function (root) {
@@ -18,6 +18,7 @@ exports.verifyWorkspace = async function () {
   const vscode = require('vscode');
   const { eventually, provider, position, range, coordinates, locations, location, hints, hint, replace } = require('./semantic-support.cjs');
   const { assertHover } = require('./hover-integration.cjs');
+  const { assertSignature } = require('./signature-integration.cjs');
   const root = process.env.IRIS_TEST_WORKSPACE;
   assert.ok(root, 'The runner must supply its isolated workspace');
   assert.equal(await fs.realpath(vscode.workspace.workspaceFolders[0].uri.fsPath), await fs.realpath(root));
@@ -39,7 +40,10 @@ exports.verifyWorkspace = async function () {
     location(source.uri, range(caller, 'read')),
   ]));
   const initialHints = await hints(source);
-  await assertHover(source, range(caller, 'read'), [/\bread\s*\(/, /->\s*Integer\b/]);
+  await assertHover(source, range(caller, 'read'), [/\bread\s*\(/, /->\s*Integer\b/, /Original docs/]);
+  await assertSignature(source, position(caller, caller.indexOf('read(') + 5), {
+    active: 0, label: /read\(value: Dynamic<Object> = 1\) -> Integer/, docs: /Original docs/,
+  });
   assert.ok(initialHints.some(value => JSON.stringify(value) === JSON.stringify(hint(caller, resultOffset, ': Integer'))));
   const initialMembers = await provider('CompletionItem', source, memberCursor);
   assert.deepEqual(initialMembers.items.map(item => item.label), ['read']);
@@ -63,7 +67,7 @@ exports.verifyWorkspace = async function () {
   const target = await vscode.workspace.openTextDocument(targetUri);
   const editor = await vscode.window.showTextDocument(target);
   try {
-    const dirtyText = "// 😀\r\nmodule Core {} class Core::Thing { public fun reset() -> Integer { 0 } public fun read() -> String { 'changed' } }";
+    const dirtyText = "// 😀\r\nmodule Core {} class Core::Thing { public fun reset() -> Integer { 0 }\n/** Updated docs */\npublic fun read(changed = 'text') -> String { 'changed' } }";
     await replace(editor, dirtyText);
     await eventually('dirty cross-file definition, references, members and hints', async () => {
       assert.deepEqual(locations(await definition()), locations([location(targetUri, range(dirtyText, 'read'))]));
@@ -78,8 +82,12 @@ exports.verifyWorkspace = async function () {
         assert.deepEqual(coordinates(item.range), coordinates(range(caller, 're', caller.lastIndexOf('re }'))));
       }
       const updatedHints = await hints(source);
-      const hover = await assertHover(source, range(caller, 'read'), [/\bread\s*\(/, /->\s*String\b/]);
+      const hover = await assertHover(source, range(caller, 'read'), [/\bread\s*\(/, /->\s*String\b/, /Updated docs/]);
       assert.doesNotMatch(hover, /->\s*Integer\b/);
+      assert.doesNotMatch(hover, /Original docs/);
+      await assertSignature(source, position(caller, caller.indexOf('read(') + 5), {
+        active: 0, label: /read\(changed: Dynamic<Object> = 'text'\) -> String/, docs: /Updated docs/,
+      });
       assert.ok(updatedHints.some(value => JSON.stringify(value) === JSON.stringify(hint(caller, resultOffset, ': String'))));
       assert.ok(!updatedHints.some(value => JSON.stringify(value) === JSON.stringify(hint(caller, resultOffset, ': Integer'))));
     });

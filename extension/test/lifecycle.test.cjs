@@ -185,7 +185,7 @@ test('reports command and negotiated capabilities when normal startup succeeds',
   assert.deepEqual(records, [
     { command: '/selected/server' },
     { serverInfo: { name: 'fixture-server', version: '1' }, capabilities: {
-      formatting: true, definition: true, references: true, completion: true, inlayHints: true, hover: true,
+      formatting: true, definition: true, references: true, completion: true, inlayHints: true, hover: true, signatureHelp: true,
     } },
   ]);
   assert.equal(input.warnings.length, 0);
@@ -199,8 +199,18 @@ test('retains available features when the server advertises only completion', as
   assert.equal(input.clients[0].running, true);
   const initialized = JSON.parse(input.lines[1].slice(input.lines[1].indexOf('{')));
   assert.deepEqual(initialized.capabilities, {
-    formatting: false, definition: false, references: false, completion: true, inlayHints: false, hover: false,
+    formatting: false, definition: false, references: false, completion: true, inlayHints: false, hover: false, signatureHelp: false,
   });
   assert.ok(input.lines.length >= 2);
+  await input.deactivate();
+});
+
+test('keeps Markdown untrusted and HTML disabled when native providers are created', async () => {
+  const input = scenario({ command: 'server' });
+  await input.activate(input.context);
+  assert.equal(input.clients[0].configuration.markdown?.isTrusted, false);
+  assert.equal(input.clients[0].configuration.markdown?.supportHtml, false);
+  assert.equal(input.clients[0].configuration.middleware.provideHover, undefined);
+  assert.equal(input.clients[0].configuration.middleware.provideSignatureHelp, undefined);
   await input.deactivate();
 });

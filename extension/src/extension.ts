@@ -61,6 +61,7 @@ async function start(): Promise<void> {
     client = new ServerClient(command, {
       documentSelector: [{ scheme: "file", language: "iris" }, { scheme: "untitled", language: "iris" }],
       outputChannel: output,
+      markdown: { isTrusted: false, supportHtml: false },
       synchronize: { fileEvents },
       initializationFailedHandler: () => false,
       errorHandler: {
@@ -95,6 +96,7 @@ async function start(): Promise<void> {
       completion: Boolean(result?.capabilities.completionProvider),
       inlayHints: Boolean(result?.capabilities.inlayHintProvider),
       hover: Boolean(result?.capabilities.hoverProvider),
+      signatureHelp: Boolean(result?.capabilities.signatureHelpProvider),
     };
     output.appendLine(`Language server initialized: ${JSON.stringify({ serverInfo: result?.serverInfo ?? null, capabilities })}`);
     const missing = Object.entries(capabilities).filter(([, available]) => !available).map(([name]) => name);

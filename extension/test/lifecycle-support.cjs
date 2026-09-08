@@ -49,6 +49,7 @@ function scenario(options = {}) {
       this.initializeResult = { serverInfo: { name: 'fixture-server', version: '1' }, capabilities: state.capabilities ?? {
         documentFormattingProvider: true, definitionProvider: true, referencesProvider: true,
         completionProvider: {}, inlayHintProvider: true, hoverProvider: true,
+        signatureHelpProvider: { triggerCharacters: ['(', ','], retriggerCharacters: [','] },
       } };
       clients.push(this);
       events.push(`construct:${this.command}`);

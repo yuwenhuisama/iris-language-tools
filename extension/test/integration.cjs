@@ -21,10 +21,12 @@ exports.run = async function () {
   assert.ok(extension);
   await extension.activate();
   await require('./hover-integration.cjs').verifyHover();
+  await require('./signature-integration.cjs').verifySignatures();
   await require('./semantic-integration.cjs').verifySemantics();
   await require('./editing.test.cjs').run();
   await require('./formatting-integration.cjs').verifyFormatting();
   await require('./runtime-formatting.cjs').verifyRuntimeFormatting();
+  await require('./signature-integration.cjs').verifySignatureTyping();
   if (process.env.IRIS_TEST_EMPTY === '1') {
     await verifyEmptyWorkspace();
     return;

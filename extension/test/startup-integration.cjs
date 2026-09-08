@@ -4,12 +4,13 @@ const path = require('node:path');
 const vscode = require('vscode');
 const { eventually, provider, position, range, locations, location, hints, replace } = require('./semantic-support.cjs');
 const { assertHover } = require('./hover-integration.cjs');
+const { assertSignature } = require('./signature-integration.cjs');
 
 exports.run = async function () {
   const extension = vscode.extensions.getExtension('iris-local.iris-language-tools');
   assert.ok(extension);
   assert.equal(extension.isActive, false, 'Fresh host must not pre-activate Iris');
-  const source = 'module Main { let value=1; value; fun read(value) { value } }';
+  const source = 'module Main { let value=1; value;\n/// Read docs\nfun read(value) { value } read(1) }';
   const suffix = process.env.IRIS_STARTUP_SUFFIX;
   assert.ok(['.ir', '.iris'].includes(suffix));
   const file = path.join(process.env.IRIS_STARTUP_WORKSPACE, `automatic${suffix}`);
@@ -34,11 +35,14 @@ exports.run = async function () {
     }
   }
 
-  await eventually(`${suffix} definition and Hover availability`, async () => {
+  await eventually(`${suffix} definition, Hover and SignatureHelp availability`, async () => {
     assert.deepEqual(locations(await provider('Definition', document, position(source, source.indexOf('value;')))), locations([
       location(document.uri, range(source, 'value')),
     ]));
     await assertHover(document, range(source, 'value', source.indexOf('value;')), [/\bvalue\b/, /\bInteger\b/]);
+    await assertSignature(document, position(source, source.lastIndexOf('read(') + 5), {
+      active: 0, label: /read\(value: Dynamic<Object>\)/, docs: /Read docs/,
+    });
   });
   if (process.env.IRIS_STARTUP_RECOVERY === 'true') console.log('PASS: missing executable recovered after User serverPath correction and explicit native restart command');
   assert.deepEqual(locations(await provider('Reference', document, position(source, source.indexOf('value')))), locations([
@@ -73,6 +77,9 @@ exports.run = async function () {
     ]));
     assert.ok((await provider('FormatDocument', irisDocument, { tabSize: 2, insertSpaces: true })).length > 0);
     await assertHover(irisDocument, range(source, 'value', source.indexOf('value;')), [/\bvalue\b/, /\bInteger\b/]);
+    await assertSignature(irisDocument, position(source, source.lastIndexOf('read(') + 5), {
+      active: 0, label: /read\(value: Dynamic<Object>\)/, docs: /Read docs/,
+    });
   });
   console.log('PASS: source-defined .ir member completion and unchanged .iris recognition/providers');
 };
