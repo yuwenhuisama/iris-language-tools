@@ -31,17 +31,24 @@ Run **Iris: Restart Language Server** after changing the server path. Open a `.i
 or `.iris` file in a trusted workspace to activate automatically. Both suffixes use
 the same Iris v1 grammar; `.ir` does not enable archived legacy syntax.
 Both files and untitled Iris buffers receive lexical diagnostics,
-definitions, references, hover, symbol/member completion and type inlay hints. Standard
+definitions, references, hover, signature help, symbol/member completion and type inlay hints. Standard
 VS Code navigation, hover and completion work through the language client without
 custom providers or click handlers. Hover a statically resolved symbol to see its
-type or source method signature at the selected occurrence. Hover uses current
+type or syntax-highlighted source method signature at the selected occurrence. Native
+hover cards separate kind, owner, type or declared return, and documentation.
+Attached `///` and `/** ... */` comments appear as literal paragraphs, not a tag
+language or executable Markdown. HTML and trusted Markdown commands are disabled
+through the language client's public options. Rendering is limited to 8 KiB of
+UTF-8, with balanced fences and explicit truncation. Hover uses current
 unsaved source, including dirty same-package targets; unknown members return no
-hover rather than a guessed signature. Documentation comments are not attached to
-analysis metadata yet, so hover does not include documentation text.
+hover rather than a guessed signature. Signature Help uses the standard VS Code
+parameter-hints widget: type `(` or `,`, or invoke **Trigger Parameter Hints**.
+It shows the resolved source signature, documentation and current parameter,
+including nested calls, keyword arguments, rest channels and discard parameters.
 Type hints are enabled for Iris by default and can be changed with
 `editor.inlayHints.enabled`. The Output panel's `Iris Language Server` channel shows
 the selected startup command, initialized server name/version and availability of
-formatting, definition, references, completion, inlay hints and hover, plus startup errors
+formatting, definition, references, completion, inlay hints, hover and signature help, plus startup errors
 and lexical errors whose source position is unavailable. Startup logging does not
 include source text. If a server omits an expected capability, a warning suggests
 checking for a stale or wrong executable; available features remain enabled.
@@ -138,9 +145,24 @@ requires a POSIX shebang host and does not download a runtime.
 
 The integration suite calls `vscode.executeHoverProvider` against the real server
 for untitled Integer types, current-buffer type changes, annotated source method
-signatures, exact UTF-16 occurrence ranges and unknown-member refusal. Same-package
+signatures, exact UTF-16 occurrence ranges, safe native rich cards with both
+documentation forms, and unknown-member refusal. It invokes
+`vscode.executeSignatureHelpProvider` for nested calls, current parameters,
+keyword/rest channels and `_`. A separate native-interaction probe focuses the
+window and editor, invokes the canonical `type` command for `(` and `,`, and
+invokes the parameter-hints command. Successful typing requires document-change
+events and active parameters 0 and 1 at the actual editor cursor. This checks
+provider results after the command, not the widget's rendered pixels. If the
+host remains unfocused and produces no document change in the active target, the
+probe prints `UNAVAILABLE` with document
+versions and window/editor focus evidence; it never substitutes builder edits
+or reports a typing pass. Wrong edits or parameter results still fail. The probe
+runs after the mandatory provider and same-package tests, so unavailable native
+input cannot hide their failures. Same-package
 tests change an unsaved target return type from Integer to String and require the
-caller's hover to update while retaining the caller's range, without saving the target.
+caller's hover and signature documentation to update while retaining the caller's
+range, without saving the target. Fresh startup tests require Signature Help for
+both `.ir` and `.iris` alongside all existing providers.
 To run against an existing editor without downloads, set `VSCODE_EXECUTABLE_PATH`
 to the cached native VS Code executable before `npm run test:integration`.
 

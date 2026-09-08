@@ -38,7 +38,8 @@ historical Notepad++ highlighting are not the v1 grammar authority.
 - Static semantic navigation: Go to Definition (`F12` / `Ctrl+Click`) and Find References (`Shift+F12`).
 - Smart completion for variables, parameters, constants, source classes, modules, contracts, type aliases, and known typed members alongside keywords.
 - Type inlay hints showing local variable types, literal types, and explicit method return annotations.
-- Hover showing resolved source declarations, method signatures and known types at the current cursor.
+- Rich Hover with highlighted signatures, symbol kind/owner, type details and attached documentation.
+- Signature Help for resolved source methods, with current positional, keyword and rest parameters.
 - Same-package cross-file resolution using manifest source lists from `iris.toml`.
 - Official-style document formatting through a bounded, isolated LSP worker.
 - VS Code `.iris` and `.ir` registration, TextMate syntax highlighting, Enter/indentation rules, and eight snippets. Both suffixes use v1 syntax, not the archived legacy grammar.
@@ -52,7 +53,8 @@ Static queries run in a dedicated background worker thread over immutable analys
 - **References (`Shift+F12`)**: Finds statically resolved symbol references across the package resolution group. References are static symbol bindings, not all possible dynamic runtime call targets.
 - **Completion**: Offers in-scope identifiers, known member access, and keywords. Keywords are suppressed inside member dots, namespace qualifiers, string literals, and comments. Incomplete recovery regions retain replacement spans.
 - **Inlay Hints**: Shows local inferred types for unannotated bindings and literals. Omitted method parameter and return annotations remain `Dynamic<Object>` under `TYPES-C003`; method bodies do not create inferred signature hints.
-- **Hover**: Mouse over a resolved variable, parameter, method or type name to see its declaration/signature and available type information. Results follow unsaved buffers and same-package targets. Unknown or ambiguous symbols produce no card. Documentation comments are not attached or displayed; Signature Help is separate and not implemented.
+- **Hover**: Mouse over a resolved variable, parameter, method or type name to see a highlighted declaration/signature, kind, owner and type details. Immediately preceding standalone `///` runs and `/** ... */` blocks supply documentation; blank lines, ordinary comments and trailing comments break attachment. Documentation is displayed as literal text, not executable Markdown. Results follow unsaved buffers and same-package targets; unknown or ambiguous symbols produce no card.
+- **Signature Help**: Parameter hints use the resolved source method's signature while editing calls, including incomplete `method(` and `method(value,` input. Nested calls select the innermost target; named arguments match keyword parameters, and extra positionals select a declared rest parameter. Unknown callees and uncertain mappings return no hints rather than guessing. Trigger characters are `(`, `,`, `:`; `)` retriggers an already open hint.
 - **Workspace Packages**: Discovers `iris.toml` manifests and tracks explicit `sources` lists. Open unsaved editor buffers serve as overlays that take precedence over disk. Standalone files and conflicting package declarations remain safely isolated. The server reads manifest sources when needed and never writes to disk.
 
 ### Boundaries and Limitations
@@ -121,8 +123,9 @@ Building the language server depends directly on the sibling `Iris-Language` par
 syntax, and lexer crates. When updating either checkout, rebuild the server to ensure
 binary compatibility with the companion frontend:
 
-Use the sibling language repository's `new-iris-dev` branch containing `f260d5f`
-or a descendant. Missing `iris_parser::source`, `parse_editor`, or `Token.end`
+Use the sibling language repository's `new-iris-dev` branch containing `b48eff4`
+or a descendant, including documentation, parameter-slot and call-site metadata.
+Missing `iris_parser::source`, `parse_editor`, `lex_with_comments`, or `Token.end`
 during compilation means that checkout is too old. Cargo path dependencies read
 local source; `--locked` does not update the sibling Git checkout. A failed build
 can leave an older executable on disk.

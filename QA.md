@@ -1,5 +1,43 @@
 # Local MVP Verification
 
+## Rich Hover And Signature Help
+
+This milestone adds parser-owned documentation attachments and call
+slots, rich native Hover cards, and source-resolved Signature Help. Earlier gate
+approvals below are historical and do not approve these additions.
+
+- Parent lexer/parser rerun: 263 tests passed; strict scoped Clippy passed.
+- Parent tools serial locked/offline rerun after header-validity repair: 391 tests
+  passed (111 analysis, 105 formatter, 175 server); build and strict Clippy passed.
+  The updated parser suite passed 205 tests. Scoped formatting checks pass except
+  pre-existing formatting differences in the concurrently edited parser `lib.rs`.
+- Real VS Code provider checks passed rich fenced signatures, owner/kind/return
+  details, both documentation forms, inert hostile documentation, current-buffer
+  changes and Signature Help parameter selection for nested/keyword/rest/discard
+  cases. Cross-file unsaved documentation/signature updates also passed in the
+  complete native-host run. The initial typing probe failed: `default:type`
+  produced no document change. Canonical `type` and explicit window focus did not
+  change that: version stayed 1, windowFocused was false, and the active document
+  matched. Only that condition is reported as UNAVAILABLE; it is not a typing or
+  widget pass. Incorrect edits, focused-window no-ops and wrong parameters still
+  fail. Direct-provider queries do not establish automatic trigger or pixel proof.
+- Documentation text is bounded to 2 KiB, signature labels to 4 KiB, and final
+  Hover markup to 8 KiB. Parameter byte ranges are converted to UTF-16 only after
+  signature construction; unsupported or uncertain targets are not synthesized.
+- Mandatory editor-provider acceptance passed; physical typing/widget appearance
+  remains unverified. The first gate returned REJECT: parameter-order errors
+  emitted after the closing parenthesis were outside the recorded signature span,
+  allowing invalid method Hover and active-parameter guidance. Explicit header
+  validity now gates both queries. Real stdio regressions verify 63 null responses
+  across 21 malformed variants while valid incomplete bodies/calls remain usable.
+  Parent editor-provider acceptance was rerun successfully after this repair;
+  the focused Oracle re-review returned APPROVE with high confidence. It independently
+  passed seven parser tests, 14 analysis tests and two real-server tests, confirming
+  the malformed-header refusals and valid recovery controls. No unresolved blocker
+  remains from the gate findings; physical UI and Windows coverage are not certified.
+  The user authorized committing and pushing this milestone together with the
+  six existing runtime repair commits in the companion language repository.
+
 ## Hover Milestone
 
 Hover implementation passed its scoped final gate. It reuses resolved occurrences,

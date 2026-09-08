@@ -15,7 +15,7 @@ reserved for Content-Length-framed JSON-RPC; startup failures use stderr.
 - Lexer-only diagnostics on open/change; empty publication on fix or close.
 - Document formatting through `iris-formatter`, using current unsaved text.
 - Parsing runs in a dedicated semantic thread or formatting child, never in the main loop.
-- Static hover, definition, references, completion, and type inlay hints through `iris-analysis`.
+- Static hover, signature help, definition, references, completion, and type inlay hints through `iris-analysis`.
 - No evaluation, dependency fetching, builds, or user code execution.
 - Full-document official-style formatting via `iris-formatter`, using the latest
   synchronized buffer and a UTF-16 full-document edit. Unchanged, unknown, closed
@@ -25,7 +25,7 @@ reserved for Content-Length-framed JSON-RPC; startup failures use stderr.
 ## Semantic Queries
 
 The server advertises definition (`F12` / `Ctrl+Click`), references (`Shift+F12`),
-hover, completion, and type inlay hints at initialization.
+hover, signature help, completion, and type inlay hints at initialization.
 
 A dedicated semantic worker thread handles at most 32 outstanding requests.
 Input and result channels are bounded. Immutable workspace and parsed analysis
@@ -64,6 +64,25 @@ partially missing reference results. Completion on available sources marks
 
 ### Feature Behavior
 
+- **Signature Help**: `textDocument/signatureHelp` advertises `(`, `,`, and `:`
+  triggers and `)` retriggers. The current snapshot resolves the innermost source-defined
+  callable, preserving declared types, default expressions, discard slots, rest parameters,
+  keyword parameters, and attached documentation. Nested argument commas do not advance
+  outer slots. Trailing argument holes and incomplete EOF calls are supported where the
+  parser can retain safe call metadata. An unknown inner callee never falls back to an
+  outer signature; unknown callees or uncertain argument mappings return `null`.
+  One signature is returned with `activeSignature: 0` and a mapped top-level
+  `activeParameter`; zero-parameter calls omit the active parameter. The optional
+  per-signature `activeParameter` field is not used. Request context is decoded but
+  client-provided active signatures never override snapshot analysis.
+  Documentation format preferences are negotiated independently of hover, defaulting
+  to plaintext. Markdown documentation uses the shared bounded literal renderer, escaping
+  links, HTML, and punctuation without commands or trusted markup. Parameter labels are
+  exact substrings unless `parameterInformation.labelOffsetSupport` is explicitly true;
+  then they are UTF-16 start/end offsets into the final, unmodified signature label,
+  including when an earlier default contains astral characters. Requests produce no
+  text edits and use the same 32-job queue, epoch/version/generation checks, cancellation,
+  and unsaved cross-file overlays as other semantic queries.
 - **Hover**: Displays a statically resolved declaration signature and useful nonduplicate
   type information. The exact UTF-16 range covers the hovered name in the requested
   document, including for same-package cross-file targets. Unknown sources, unresolved
@@ -109,7 +128,8 @@ otherwise it is detached. No semantic child process is spawned per keystroke.
 - **No runtime program execution**: Code is never evaluated or executed for semantic
   analysis. All information is derived from static parser source graph facts.
 - **Parser recovery scope**: Editor recovery in `iris-parser` preserves usable facts
-  only for trailing EOF block braces and incomplete dot expressions (`receiver.`).
+  for trailing EOF block braces, incomplete dot expressions (`receiver.`), and bounded
+  incomplete call arguments used by signature help.
   Partial namespace qualifiers (`Namespace::ident`) resolve when an identifier prefix
   exists, but incomplete `Namespace::` without an identifier production is suppressed.
 - **No guessed links**: Unknown receivers or unresolved identifiers return empty
