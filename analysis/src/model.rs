@@ -1,6 +1,8 @@
 use std::sync::Arc;
 
+pub use iris_parser::source::DeclarationKind as HoverKind;
 pub use iris_parser::source::Span;
+pub use iris_syntax::ParameterCategory;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct FileId(pub u32);
@@ -68,4 +70,42 @@ pub struct HoverInfo {
     pub span: Span,
     pub signature: String,
     pub type_label: Option<String>,
+    pub kind: HoverKind,
+    pub owner: Option<String>,
+    pub details: Vec<HoverDetail>,
+    pub docs: Option<DocumentationInfo>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum HoverDetail {
+    ReturnType(String),
+    ValueType(String),
+    ParameterCategory(ParameterCategory),
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DocumentationInfo {
+    pub text: String,
+    pub truncated: bool,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SignatureHelpInfo {
+    pub signature: SignatureInfo,
+    pub active_parameter: Option<usize>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SignatureInfo {
+    pub label: String,
+    pub parameters: Vec<SignatureParameterInfo>,
+    pub docs: Option<DocumentationInfo>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SignatureParameterInfo {
+    pub label: Span,
+    pub name: String,
+    pub category: ParameterCategory,
+    pub docs: Option<DocumentationInfo>,
 }

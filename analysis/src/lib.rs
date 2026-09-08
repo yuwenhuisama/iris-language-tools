@@ -14,6 +14,7 @@ mod model;
 mod navigation;
 mod qualified;
 mod resolve;
+mod signature_help;
 mod types;
 
 pub use model::*;

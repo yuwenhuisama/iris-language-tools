@@ -20,6 +20,7 @@ let references = snapshot.references(FileId(1), 18, true);
 let completions = snapshot.completions(FileId(1), 32);
 let hints = snapshot.inlay_hints(FileId(1), Span { start: 0, end: source.len() });
 let hover = snapshot.hover(FileId(1), 28);
+let signature = snapshot.signature_help(FileId(1), 28);
 ```
 
 - `SourceInput { id: FileId, text: Arc<str>, group: GroupId }`.
@@ -38,12 +39,29 @@ let hover = snapshot.hover(FileId(1), 28);
 - `inlay_hints(file, range) -> Vec<TypeHint>` where
   `TypeHint { offset: usize, label: String }`. Labels include `: ` or ` -> `.
 - `hover(file: FileId, byte: usize) -> Option<HoverInfo>` where
-  `HoverInfo { span: Span, signature: String, type_label: Option<String> }`.
+  `HoverInfo { span, signature, type_label, kind, owner, details, docs }`.
+  The original `span: Span`, `signature: String`, and `type_label: Option<String>`
+  remain available. Additive `kind: HoverKind` is the parser's declaration kind,
+  `owner: Option<String>` is the graph-derived lexical owner, and
+  `details: Vec<HoverDetail>` distinguishes `ReturnType(String)`,
+  `ValueType(String)`, and `ParameterCategory(ParameterCategory)`.
   The span is the exact occurrence in the requested file, including an import
   alias, rather than the target declaration's span. Unlike navigation, hover
   accepts only positions inside the half-open occurrence, not immediately after
   a name. Invalid UTF-8 boundaries, protected text, ambiguity, and unsafe recovery
   positions return `None`.
+- `signature_help(file: FileId, byte: usize) -> Option<SignatureHelpInfo>` where
+  `SignatureHelpInfo { signature: SignatureInfo, active_parameter: Option<usize> }`.
+  `SignatureInfo { label: String, parameters: Vec<SignatureParameterInfo>, docs }`
+  contains a plain source signature. Each parameter has `label: Span` (UTF-8 byte
+  offsets into the signature label), `name: String`, `category: ParameterCategory`,
+  and `docs: Option<DocumentationInfo>`. Categories are `Positional`, `Rest`,
+  `Keyword`, `KeywordRest`, and `Block`. An empty signature has no active parameter;
+  an unmappable argument returns no help, rather than letting LSP default to zero.
+- `DocumentationInfo { text: String, truncated: bool }` is plain untrusted text,
+  attached by parser declaration identity, not interpreted Markdown. All `docs`
+  fields use `Option<DocumentationInfo>`. Parameter docs remain absent unless the
+  parser attaches documentation to that parameter declaration.
 
 All coordinates are UTF-8 bytes; spans and hint request ranges are half-open.
 Completion replacement ranges can extend past the cursor to replace an existing
@@ -114,8 +132,22 @@ Written `typeof` remains in the signature but has no inferred type label.
 Signature and type-label payloads together are bounded to 4096 UTF-8 bytes, with
 at most 1024 bytes for the type label. Text is accumulated incrementally and
 truncated at character boundaries with `... [truncated]`. Trivia is compacted
-without rewriting literal token contents. No documentation is extracted: the
-source graph does not promise reliable comment attachment.
+without rewriting literal token contents. Documentation comes only from parser
+attachments, preserves paragraphs, and is independently bounded to 2048 UTF-8
+bytes with the parser's `truncated` flag. Owner labels are bounded to 1024 bytes.
+
+Hover and Signature Help use the same parser-owned signature and parameter slots,
+including discard parameters, without reconstructing parameter grammar. Signature
+Help labels are bounded to 4096 UTF-8 bytes; oversized complete structures return
+`None`, never truncated labels with invalid parameter ranges. The active slot uses
+only the selected call's parser-recorded separators. The innermost enclosing call
+wins even when its callee is unknown. The cursor must be after the opening token
+and no later than the byte before the closer, or at the incomplete editor end.
+Keyword arguments map by exact keyword name and then keyword-rest; positional
+arguments skip keyword/block channels and can repeat a positional-rest slot.
+No splat, constructor, builtin, inheritance, or closure signature is synthesized.
+Incomplete-call assistance resolves only a clean callee prefix before recovery;
+the other queries' recovery barriers remain unchanged.
 
 ## Conservative Limits
 
@@ -143,6 +175,7 @@ cargo test -p iris-analysis
 cargo clippy -p iris-analysis --all-targets -- -D warnings
 cargo fmt -p iris-analysis -- --check
 cargo run -p iris-analysis --example hover
+cargo run -p iris-analysis --example signature_help
 ```
 
 Integration tests import the public crate and use the real parser. The snapshot

@@ -1,7 +1,7 @@
 use super::text::BoundedText;
-use crate::{AnalysisSnapshot, Document, Span, index::Symbol};
+use crate::{AnalysisSnapshot, Document, SignatureParameterInfo, Span, index::Symbol};
 use iris_lexer::TokenKind;
-use iris_parser::source::{DeclarationKind, ScopeKind, SourceKind, SyntaxNode};
+use iris_parser::source::{DeclarationKind, ParameterSlot, ScopeKind};
 use iris_syntax::Visibility;
 
 impl AnalysisSnapshot {
@@ -21,10 +21,17 @@ impl AnalysisSnapshot {
                 }
                 document.hover_source(header.span, output);
             }
-            DeclarationKind::Method => document.hover_method(symbol, output)?,
+            DeclarationKind::Method => {
+                document.method_display(symbol, output)?;
+            }
             DeclarationKind::Parameter => {
+                let slot = document
+                    .source
+                    .parameter_slots
+                    .iter()
+                    .find(|slot| slot.declaration == Some(symbol.key.node))?;
                 let dynamic = document.source.scope(symbol.scope).kind == ScopeKind::Method;
-                document.hover_parameter(document.source.node(symbol.key.node), output, dynamic);
+                document.parameter_display(slot, output, dynamic);
             }
             DeclarationKind::Binding
             | DeclarationKind::Constant
@@ -59,27 +66,23 @@ impl AnalysisSnapshot {
 }
 
 impl Document {
-    fn hover_method(&self, symbol: &Symbol, output: &mut BoundedText) -> Option<()> {
+    pub(super) fn method_display(
+        &self,
+        symbol: &Symbol,
+        output: &mut BoundedText,
+    ) -> Option<Vec<SignatureParameterInfo>> {
         let declaration = &symbol.declaration;
-        let close = declaration.return_hint_offset?;
-        let end = declaration
-            .return_type
-            .map_or(close, |id| self.source.node(id).span.end);
-        if self
+        let signature = self
             .source
-            .recovery
+            .signatures
             .iter()
-            .any(|region| region.span.start < end && region.span.end > symbol.span.start)
-        {
+            .find(|site| site.owner == symbol.key.node)?;
+        if !signature.valid {
             return None;
         }
-        let prefix = Span {
-            start: symbol.span.start,
-            end: declaration.name.span.start,
-        };
         let explicit_visibility = self.source.tokens.iter().any(|token| {
-            token.offset.0 >= prefix.start
-                && token.end.0 <= prefix.end
+            token.offset.0 >= signature.span.start
+                && token.end.0 <= declaration.name.span.start
                 && matches!(
                     &self.input.text[token.offset.0..token.end.0],
                     "public" | "private" | "protected"
@@ -92,80 +95,86 @@ impl Document {
                 Visibility::Protected => "protected ",
             });
         }
-        let mut start = symbol.span.start;
-        for child in &self.source.node(symbol.key.node).children {
-            let node = self.source.node(*child);
-            if node.span.end > close {
-                continue;
-            }
-            let parameter = match &node.kind {
-                SourceKind::Declaration(value) => value.kind == DeclarationKind::Parameter,
-                SourceKind::Statement => node.children.iter().any(|id| {
-                    matches!(&self.source.node(*id).kind, SourceKind::Name(site) if site.text == "_")
-                }),
-                _ => false,
-            };
-            if parameter {
-                self.hover_source(
-                    Span {
-                        start,
-                        end: node.span.start,
-                    },
-                    output,
-                );
-                if self.input.text[start..node.span.start].ends_with(char::is_whitespace) {
-                    output.push(" ");
-                }
-                self.hover_parameter(node, output, true);
-                start = node.span.end;
-            }
-            if output.full() {
-                break;
-            }
-        }
-        self.hover_source(Span { start, end }, output);
-        if declaration.return_type.is_none() {
-            output.push(" -> Dynamic<Object>");
-        }
-        Some(())
-    }
-
-    fn hover_parameter(&self, node: &SyntaxNode, output: &mut BoundedText, dynamic: bool) {
-        let annotation = node
-            .children
+        let mut start = signature.span.start;
+        let mut parameters = Vec::new();
+        for slot in self
+            .source
+            .parameter_slots
             .iter()
-            .any(|id| matches!(self.source.node(*id).kind, SourceKind::Type(_)));
-        let name = node
-            .children
-            .iter()
-            .find_map(|id| match &self.source.node(*id).kind {
-                SourceKind::Name(site) => Some(site),
-                _ => None,
-            });
-        if dynamic
-            && !annotation
-            && let Some(name) = name
+            .filter(|slot| slot.owner == symbol.key.node)
         {
             self.hover_source(
                 Span {
-                    start: node.span.start,
-                    end: name.span.end,
+                    start,
+                    end: slot.span.start,
+                },
+                output,
+            );
+            if self.input.text[start..slot.span.start].ends_with(char::is_whitespace) {
+                output.push(" ");
+            }
+            let label_start = output.len();
+            self.parameter_display(slot, output, true);
+            if output.full() {
+                return Some(parameters);
+            }
+            parameters.push(SignatureParameterInfo {
+                label: Span {
+                    start: label_start,
+                    end: output.len(),
+                },
+                name: slot.name.text.clone(),
+                category: slot.category,
+                docs: slot
+                    .declaration
+                    .and_then(|id| {
+                        self.source
+                            .documentation
+                            .iter()
+                            .find(|docs| docs.declaration == id)
+                    })
+                    .map(|docs| crate::DocumentationInfo {
+                        text: docs.text.clone(),
+                        truncated: docs.truncated,
+                    }),
+            });
+            start = slot.span.end;
+        }
+        self.hover_source(
+            Span {
+                start,
+                end: signature.span.end,
+            },
+            output,
+        );
+        if signature.return_type.is_none() {
+            output.push(" -> Dynamic<Object>");
+        }
+        Some(parameters)
+    }
+
+    fn parameter_display(&self, slot: &ParameterSlot, output: &mut BoundedText, dynamic: bool) {
+        if dynamic && slot.annotation.is_none() {
+            self.hover_source(
+                Span {
+                    start: slot.span.start,
+                    end: slot.name.span.end,
                 },
                 output,
             );
             output.push(": Dynamic<Object>");
-            if self.input.text[name.span.end..node.span.end].starts_with('=') {
+            if self.input.text[slot.name.span.end..slot.span.end].starts_with('=') {
                 output.push(" ");
             }
             self.hover_source(
                 Span {
-                    start: name.span.end,
-                    end: node.span.end,
+                    start: slot.name.span.end,
+                    end: slot.span.end,
                 },
                 output,
             );
         } else {
-            self.hover_source(node.span, output);
+            self.hover_source(slot.span, output);
         }
     }
 

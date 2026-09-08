@@ -5,6 +5,10 @@ pub(super) struct BoundedText {
 }
 
 impl BoundedText {
+    pub(super) const fn len(&self) -> usize {
+        self.text.len()
+    }
+
     pub(super) const fn full(&self) -> bool {
         self.truncated
     }

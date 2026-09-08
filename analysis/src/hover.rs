@@ -1,4 +1,5 @@
 mod labels;
+mod presentation;
 mod signature;
 mod text;
 
@@ -37,6 +38,31 @@ impl AnalysisSnapshot {
             span,
             signature: signature.finish(),
             type_label,
+            kind: symbol.declaration.kind,
+            owner: self.hover_owner(key),
+            details: self.hover_details(key),
+            docs: self.documentation(key),
+        })
+    }
+
+    pub(crate) fn signature_info(&self, key: Key) -> Option<crate::SignatureInfo> {
+        let symbol = self.symbol(key)?;
+        if symbol.declaration.kind != iris_parser::source::DeclarationKind::Method {
+            return None;
+        }
+        let document = &self.documents[&key.file];
+        if !document.safe_scope(symbol.scope, symbol.declaration.name.span.end) {
+            return None;
+        }
+        let mut output = BoundedText::new(4096);
+        let parameters = document.method_display(symbol, &mut output)?;
+        if output.full() {
+            return None;
+        }
+        Some(crate::SignatureInfo {
+            label: output.finish(),
+            parameters,
+            docs: self.documentation(key),
         })
     }
 }
