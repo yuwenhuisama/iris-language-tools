@@ -110,6 +110,16 @@ annotations remain `Dynamic<Object>` under TYPES-C003; defaults and method bodie
 never become inferred signature metadata. Return hint anchors come directly from
 the parser's `return_hint_offset`.
 
+String `split`, `chars`, `to_array`, and text `graphemes` preserve structural
+`Array<String>` facts. Integer indexing yields `String?` (including out-of-bounds
+nil), while Range indexing retains the array type. Immutable copies and explicit
+`Array<Builtin>` annotations preserve element facts without parsing display labels.
+Nullable elements do not expose definite String completions. Element inference
+refuses unknown/Dynamic elements or indexes, shadowed annotations, reopened Array
+or producer families, and incomplete inventory. A bounded same-file use scan
+refuses mutations, member calls, escapes, constant exposure, mutable aliases, and captures; it is not
+flow-sensitive and does not attempt general generic substitution.
+
 Nominal declaration values remain class/module/contract objects, not instances of
 their header types. Positional and keyword rest bindings have body types
 `Array<T>` and `Hash<Symbol, V>` under CONTROL-C023. Copies can display these
