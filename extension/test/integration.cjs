@@ -22,6 +22,7 @@ exports.run = async function () {
   await extension.activate();
   await require('./hover-integration.cjs').verifyHover();
   await require('./signature-integration.cjs').verifySignatures();
+  await require('./builtin-integration.cjs').verifyBuiltins();
   await require('./semantic-integration.cjs').verifySemantics();
   await require('./editing.test.cjs').run();
   await require('./formatting-integration.cjs').verifyFormatting();
