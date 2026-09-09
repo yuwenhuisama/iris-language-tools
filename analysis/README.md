@@ -1,7 +1,7 @@
 # iris-analysis
 
-Pure shared semantic queries for Iris editor tooling. The only dependencies are
-the sibling parser, syntax, and lexer crates. Analysis never opens files, maps
+Pure shared semantic queries for Iris editor tooling. Dependencies are the sibling
+builtin catalog, parser, syntax, and lexer crates. Analysis never opens files, maps
 URIs, launches processes, evaluates Iris, or communicates with an LSP client.
 
 ## Public API
@@ -51,17 +51,20 @@ let signature = snapshot.signature_help(FileId(1), 28);
   a name. Invalid UTF-8 boundaries, protected text, ambiguity, and unsafe recovery
   positions return `None`.
 - `signature_help(file: FileId, byte: usize) -> Option<SignatureHelpInfo>` where
-  `SignatureHelpInfo { signature: SignatureInfo, active_parameter: Option<usize> }`.
-  `SignatureInfo { label: String, parameters: Vec<SignatureParameterInfo>, docs }`
-  contains a plain source signature. Each parameter has `label: Span` (UTF-8 byte
-  offsets into the signature label), `name: String`, `category: ParameterCategory`,
-  and `docs: Option<DocumentationInfo>`. Categories are `Positional`, `Rest`,
-  `Keyword`, `KeywordRest`, and `Block`. An empty signature has no active parameter;
-  an unmappable argument returns no help, rather than letting LSP default to zero.
+  `SignatureHelpInfo { signatures: Vec<SignatureInfo>, active_signature: usize }`.
+  `SignatureInfo { active_parameter: Option<usize>, label: String, parameters: Vec<SignatureParameterInfo>, docs }`
+  contains a plain signature label and its parameter metadata. Each parameter has
+  `label: Span` (UTF-8 byte offsets into the signature label), `name: String`,
+  `category: ParameterCategory`, and `docs: Option<DocumentationInfo>`. Categories
+  are `Positional`, `Rest`, `Keyword`, `KeywordRest`, and `Block`. An empty parameter
+  list has no active parameter; an unmappable argument returns no help, rather than
+  letting LSP default to zero. When multiple call candidates exist (such as built-in
+  alternative call shapes or keyword variants), `signatures` carries valid candidates and
+  `active_signature` selects the first compatible shape in catalog order.
 - `DocumentationInfo { text: String, truncated: bool }` is plain untrusted text,
-  attached by parser declaration identity, not interpreted Markdown. All `docs`
-  fields use `Option<DocumentationInfo>`. Parameter docs remain absent unless the
-  parser attaches documentation to that parameter declaration.
+  attached by parser declaration identity or built-in catalog documentation, not
+  interpreted Markdown. All `docs` fields use `Option<DocumentationInfo>`. Parameter
+  docs remain absent unless attached to that parameter declaration.
 
 All coordinates are UTF-8 bytes; spans and hint request ranges are half-open.
 Completion replacement ranges can extend past the cursor to replace an existing
@@ -110,8 +113,8 @@ the parser's `return_hint_offset`.
 Nominal declaration values remain class/module/contract objects, not instances of
 their header types. Positional and keyword rest bindings have body types
 `Array<T>` and `Hash<Symbol, V>` under CONTROL-C023. Copies can display these
-container labels, but do not acquire the element type's member surface or guessed
-built-in members. Their omitted signature annotations still show `Dynamic<Object>`.
+container labels and known Array/Hash methods, but do not acquire the element
+type's member surface. Their omitted signature annotations still show `Dynamic<Object>`.
 
 Recovery preserves usable earlier facts only while the relevant recovery regions
 are beyond the query/name. Incomplete members retain replacement anchors, and
@@ -132,22 +135,70 @@ Written `typeof` remains in the signature but has no inferred type label.
 Signature and type-label payloads together are bounded to 4096 UTF-8 bytes, with
 at most 1024 bytes for the type label. Text is accumulated incrementally and
 truncated at character boundaries with `... [truncated]`. Trivia is compacted
-without rewriting literal token contents. Documentation comes only from parser
+without rewriting literal token contents. Source documentation comes from parser
 attachments, preserves paragraphs, and is independently bounded to 2048 UTF-8
 bytes with the parser's `truncated` flag. Owner labels are bounded to 1024 bytes.
 
-Hover and Signature Help use the same parser-owned signature and parameter slots,
-including discard parameters, without reconstructing parameter grammar. Signature
-Help labels are bounded to 4096 UTF-8 bytes; oversized complete structures return
-`None`, never truncated labels with invalid parameter ranges. The active slot uses
-only the selected call's parser-recorded separators. The innermost enclosing call
-wins even when its callee is unknown. The cursor must be after the opening token
-and no later than the byte before the closer, or at the incomplete editor end.
-Keyword arguments map by exact keyword name and then keyword-rest; positional
-arguments skip keyword/block channels and can repeat a positional-rest slot.
-No splat, constructor, builtin, inheritance, or closure signature is synthesized.
+Hover and Signature Help use the same parser-owned signature and parameter slots
+for source methods, and catalog call shapes for builtins, without reconstructing
+parameter grammar. Signature Help labels are bounded to 4096 UTF-8 bytes; oversized
+complete structures return `None`, never truncated labels with invalid parameter
+ranges. The active slot uses only the selected call's parser-recorded separators.
+The innermost enclosing call wins even when its callee is unknown. The cursor
+must be after the opening token and no later than the byte before the closer, or
+at the incomplete editor end. Keyword arguments map by exact keyword name and
+then keyword-rest; positional arguments skip keyword/block channels and can repeat
+a positional-rest slot. Built-in candidates present their distinct call shapes
+and retain compatible shapes in catalog order based on supplied argument channels.
+No splat, initializer-specific constructor, arbitrary inheritance, or closure
+signature is synthesized. Cataloged fixed constructors remain available.
 Incomplete-call assistance resolves only a clean callee prefix before recovery;
 the other queries' recovery barriers remain unchanged.
+
+## Builtin Hints and Catalog Integration
+
+Editor queries resolve built-in members and types using the shared, inert
+`iris-builtins` crate (`crates/iris-builtins` in the sibling `Iris-Language` tree).
+Because `iris-analysis` depends directly on `iris-builtins`, checking out older
+sibling revisions lacking this crate fails the build immediately rather than
+silently degrading or relying on an uncommitted commit hash.
+
+- **Receiver Resolution**: Known receiver types from literals (such as String,
+  Array, Hash, Range, Bytes, ByteArray, Float32, Float64, Integer), unannotated
+  immutable local bindings initialized to these literals, and typed annotations resolve to
+  built-in member catalogs.
+- **Nominal Values**: Immutable copies of known Class and Contract values retain
+  their metadata surface. A value annotated with a user Contract is not the
+  Contract object itself. Named services and Module source-name routes are not
+  treated as first-class service objects. Reading an ordinary Object method does
+  not infer the return type of calling that method.
+- **Surface Distinctions**: Members are segregated into instance, class-side,
+  service, global, and property surfaces. Class-side calls (e.g. `Float64.from_bits`
+   or `Object.new`) never mix with instance methods (e.g. `(1.0).to_bits`). Services
+  like `JSON` or `Unicode` route by qualified namespace and possess no instance
+  receiver. Properties have zero-parameter call shapes without permitting arbitrary
+  parentheses.
+- **Positional Placeholders vs Keywords**: Catalog labels such as `arg1`, `arg2`,
+  or `callback` are neutral positional placeholders. They are not true keyword argument
+  names. Only explicitly evidenced keyword arguments (such as `by(step: ...)` or
+  `JSON.decode(depth: ...)`) accept keyword call syntax.
+- **Return Facts and Unknown Types**: Catalog return facts reflect observed runtime
+  results, not formal declared annotations. Where returns vary by backend, depend
+  on callbacks or elements, or represent dynamic values, return types remain omitted
+  (unknown) rather than fabricated. Unknown returns do not offer fake navigation or
+  speculative dynamic narrowing.
+- **Refusal and Internal Exclusions**: Internal testing probes (e.g. `share_count`),
+  fixtures (`NativeFixture`), and refusal-only routes (e.g. `File.read_text` or
+  `FFI::Library.call`) are excluded from completion and hints.
+- **Backend Availability**: Hover cards and signature help document backend
+  availability (reference evaluator, register bytecode VM, or both) alongside
+  audit evidence anchors, avoiding false parity claims.
+
+Hosts must mark missing source inventory with
+`with_incomplete_groups(impl IntoIterator<Item = GroupId>)`. Catalog fallback is
+disabled for those groups because unseen files could shadow names or reopen
+builtins; known source facts remain available. The server conservatively marks
+all loaded groups when its workspace inventory is incomplete.
 
 ## Conservative Limits
 

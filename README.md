@@ -12,6 +12,7 @@ tools as sibling checkouts:
 ```text
 Project/
   Iris-Language/
+    crates/iris-builtins/
     crates/iris-lexer/
   iris-language-tools/
     language/keywords.json
@@ -20,8 +21,13 @@ Project/
     extension/
 ```
 
-The formatter uses local Cargo path dependencies on `iris-lexer`, `iris-parser`
-and `iris-syntax` from the language repository.
+The server and analysis crates use local Cargo path dependencies on `iris-builtins`,
+`iris-lexer`, `iris-parser` and `iris-syntax` from the language repository.
+`iris-builtins` is an inert, `no_std`, dependency-free catalog crate providing
+verified runtime surfaces, parameter shapes, and backend availability. Because
+`iris-language-tools` references this path dependency directly, an older sibling
+checkout lacking `iris-builtins` fails compilation immediately rather than building
+with missing built-in metadata.
 No compiler source is copied into this repository. The inspected language
 checkout was at `91c1b8dd68e69978c6b268a5d487017396c70737` with existing local
 changes; this is provenance, not a pinned dependency. The sibling checkout's
@@ -51,10 +57,10 @@ Static queries run in a dedicated background worker thread over immutable analys
 
 - **Definition (`F12` / `Ctrl+Click`)**: Jumps to the exact declaration site of symbols across open buffers and same-package files. Unknown targets return empty results without guessing.
 - **References (`Shift+F12`)**: Finds statically resolved symbol references across the package resolution group. References are static symbol bindings, not all possible dynamic runtime call targets.
-- **Completion**: Offers in-scope identifiers, known member access, and keywords. Keywords are suppressed inside member dots, namespace qualifiers, string literals, and comments. Incomplete recovery regions retain replacement spans.
+- **Completion**: Offers in-scope identifiers, known member access, and keywords. Keywords are suppressed inside member dots, namespace qualifiers, string literals, and comments. Incomplete recovery regions retain replacement spans. Member completion covers both source-defined symbols and cataloged built-in members on known receiver types.
 - **Inlay Hints**: Shows local inferred types for unannotated bindings and literals. Omitted method parameter and return annotations remain `Dynamic<Object>` under `TYPES-C003`; method bodies do not create inferred signature hints.
-- **Hover**: Mouse over a resolved variable, parameter, method or type name to see a highlighted declaration/signature, kind, owner and type details. Immediately preceding standalone `///` runs and `/** ... */` blocks supply documentation; blank lines, ordinary comments and trailing comments break attachment. Documentation is displayed as literal text, not executable Markdown. Results follow unsaved buffers and same-package targets; unknown or ambiguous symbols produce no card.
-- **Signature Help**: Parameter hints use the resolved source method's signature while editing calls, including incomplete `method(` and `method(value,` input. Nested calls select the innermost target; named arguments match keyword parameters, and extra positionals select a declared rest parameter. Unknown callees and uncertain mappings return no hints rather than guessing. Trigger characters are `(`, `,`, `:`; `)` retriggers an already open hint.
+- **Hover**: Mouse over a resolved variable, parameter, method, type name or built-in member to see a highlighted declaration/signature, kind, owner and type details. For built-ins, hover cards display member signatures, owner, known return type, implementation evidence, and backend availability across the reference evaluator and VM. Immediately preceding standalone `///` runs and `/** ... */` blocks supply documentation; blank lines, ordinary comments and trailing comments break attachment. Documentation is displayed as literal text, not executable Markdown. Results follow unsaved buffers and same-package targets; unknown or ambiguous symbols produce no card.
+- **Signature Help**: Parameter hints use the resolved callable signature while editing calls, including incomplete `method(` and `method(value,` input. Both source methods and built-in member shapes are supported. Nested calls select the innermost target; named arguments match keyword parameters, and extra positionals select a declared rest parameter. Built-in hints retain compatible call shapes in catalog order, without selecting by inferred runtime types. Unknown callees and uncertain mappings return no hints rather than guessing. Trigger characters are `(`, `,`, `:`; `)` retriggers an already open hint.
 - **Workspace Packages**: Discovers `iris.toml` manifests and tracks explicit `sources` lists. Open unsaved editor buffers serve as overlays that take precedence over disk. Standalone files and conflicting package declarations remain safely isolated. The server reads manifest sources when needed and never writes to disk.
 
 ### Boundaries and Limitations
@@ -123,9 +129,10 @@ Building the language server depends directly on the sibling `Iris-Language` par
 syntax, and lexer crates. When updating either checkout, rebuild the server to ensure
 binary compatibility with the companion frontend:
 
-Use the sibling language repository's `new-iris-dev` branch containing `b48eff4`
-or a descendant, including documentation, parameter-slot and call-site metadata.
-Missing `iris_parser::source`, `parse_editor`, `lex_with_comments`, or `Token.end`
+Use the sibling language repository's `new-iris-dev` branch containing `16b1b1a`
+or a descendant, including documentation, parameter-slot, call-site metadata, and the
+`crates/iris-builtins` catalog crate.
+Missing `iris_builtins`, `iris_parser::source`, `parse_editor`, `lex_with_comments`, or `Token.end`
 during compilation means that checkout is too old. Cargo path dependencies read
 local source; `--locked` does not update the sibling Git checkout. A failed build
 can leave an older executable on disk.

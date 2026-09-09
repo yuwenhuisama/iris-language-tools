@@ -33,9 +33,11 @@ the same Iris v1 grammar; `.ir` does not enable archived legacy syntax.
 Both files and untitled Iris buffers receive lexical diagnostics,
 definitions, references, hover, signature help, symbol/member completion and type inlay hints. Standard
 VS Code navigation, hover and completion work through the language client without
-custom providers or click handlers. Hover a statically resolved symbol to see its
-type or syntax-highlighted source method signature at the selected occurrence. Native
-hover cards separate kind, owner, type or declared return, and documentation.
+custom providers or click handlers. Hover a statically resolved symbol or built-in member
+to see its type, signature, and documentation at the selected occurrence. For built-ins,
+hover cards display implementation evidence and availability across the reference evaluator
+and register bytecode VM, distinguishing class, instance, service, and property surfaces.
+Native hover cards separate kind, owner, type or declared return, and documentation.
 Attached `///` and `/** ... */` comments appear as literal paragraphs, not a tag
 language or executable Markdown. HTML and trusted Markdown commands are disabled
 through the language client's public options. Rendering is limited to 8 KiB of
@@ -43,15 +45,18 @@ UTF-8, with balanced fences and explicit truncation. Hover uses current
 unsaved source, including dirty same-package targets; unknown members return no
 hover rather than a guessed signature. Signature Help uses the standard VS Code
 parameter-hints widget: type `(` or `,`, or invoke **Trigger Parameter Hints**.
-It shows the resolved source signature, documentation and current parameter,
-including nested calls, keyword arguments, rest channels and discard parameters.
-Type hints are enabled for Iris by default and can be changed with
-`editor.inlayHints.enabled`. The Output panel's `Iris Language Server` channel shows
-the selected startup command, initialized server name/version and availability of
-formatting, definition, references, completion, inlay hints, hover and signature help, plus startup errors
-and lexical errors whose source position is unavailable. Startup logging does not
-include source text. If a server omits an expected capability, a warning suggests
-checking for a stale or wrong executable; available features remain enabled.
+It shows the resolved source signature or matching built-in call shapes, documentation
+and current parameter, including nested calls, keyword arguments, rest channels and
+discard parameters. Built-in hints expose multiple candidates where variants exist,
+filtering by supplied argument layout and retaining catalog order. Parameter placeholders are neutral
+positional labels rather than inferred keywords. Type hints are enabled for Iris by
+default and can be changed with `editor.inlayHints.enabled`. The Output panel's
+`Iris Language Server` channel shows the selected startup command, initialized server
+name/version and availability of formatting, definition, references, completion, inlay
+hints, hover and signature help, plus startup errors and lexical errors whose source
+position is unavailable. Startup logging does not include source text. If a server omits
+an expected capability, a warning suggests checking for a stale or wrong executable;
+available features remain enabled.
 
 Startup failures offer **Show Output**, **Open Settings** and **Retry**. Correct the
 machine-scoped `iris.serverPath` in User settings, build the server if necessary,
@@ -172,6 +177,9 @@ Semantic queries use current unsaved buffers. Cross-file queries use sources
 selected by `iris.toml` within the same manifest group; source and manifest file
 changes (`.ir`, `.iris` and `iris.toml`) refresh the index. Standalone buffers remain isolated. Known receiver
 types provide member completion, including incomplete trailing-dot edits.
+Built-in catalog hints index verified runtime surfaces; internal fixtures and
+refusal-only routes remain excluded, and unknown return types do not produce
+speculative dynamic navigation.
 Omitted named-method parameter and return annotations display `Dynamic<Object>`;
 local types are inferred conservatively, and explicit annotations get no redundant
 hints. External packages and uncertain composed member surfaces remain unsupported.

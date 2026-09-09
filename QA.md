@@ -1,5 +1,72 @@
 # Local MVP Verification
 
+## Builtin Assistance
+
+Local implementation verified on 2026-09-08. The final focused gate review
+returned APPROVE. The companion `iris-builtins` crate supplies inert catalog metadata;
+the parser supplies typed collection/range facts. The user subsequently authorized
+committing and pushing this milestone. Before publishing, the exact staged trees
+were exported as sibling checkouts and the tools workspace tests passed without
+the unrelated concurrent decorator implementation changes.
+
+Parent verification so far:
+
+- Baseline tools workspace: 391 tests passed; extension: 84 tests passed.
+- New real-stdio regressions first reproduced eight missing-feature failures
+  against the existing server binary. All 15 builtin protocol/workspace tests
+  subsequently passed against the rebuilt server.
+- Companion parser: all 213 tests passed, including eight new receiver-fact tests.
+  New test-only Clippy violations were fixed without removing assertions.
+- Catalog: ten tests passed; two opt-in CLI parity tests also passed with the
+  existing local CLI, exercising both reference and VM routes. Catalog strict
+  Clippy passed. Its public driver reported 642 descriptors, seven class names,
+  and 20 service names; descriptors include distinct call/property surfaces.
+- Parent native VS Code 1.136.1 runs passed in ordinary and empty workspaces.
+  Both `.iris` and `.ir` covered String completion, UTF-16 Hover ranges, replace's
+  second parameter, Array exclusions, Float64 class/instance separation, source
+  shadowing, Dynamic refusal, and unsaved String-to-Array updates. Existing source
+  navigation, Hover/signatures, formatting, and empty-workspace guards also passed.
+  Tests use `(1.0).` to avoid ambiguous trailing numeric punctuation. Native
+  completion may include editor word suggestions: the Dynamic check rejects
+  method-kind items and builtin selectors; real stdio still requires no items.
+- Physical typing remains UNAVAILABLE: `type("(")` caused no matching document
+  event, version stayed 1, `windowFocused=false`, and the active document matched.
+  Provider acceptance is not an automatic-trigger, screenshot, or Windows pass.
+  Optional VM formatting equivalence was skipped because `IRIS_TEST_EXECUTABLE`
+  was not set in these editor runs; standalone catalog runtime parity did run.
+- Initial integrated full-suite verification found two server regressions:
+  incomplete workspace inventory incorrectly allowed builtin fallback, and the
+  stalled-formatting test assumed the old keyword-only response shape. These
+  were repaired: incomplete groups disable catalog fallback, while keyword tests
+  retain their exact keyword assertions separately from new builtin items.
+
+Final parent rerun before independent review: tools workspace tests, all-target
+build, strict workspace Clippy and formatting checks passed. Thirteen new
+call-shape tests cover argument compatibility, duplicate keywords, trailing
+blocks, rest and incomplete calls. The earlier candidate-count regression now
+requires exactly the compatible shapes rather than retaining invalid choices.
+The rebuilt server passed the native ordinary- and empty-workspace suites again,
+including both suffixes and existing source features. Independent review returned
+REJECT for two concrete blockers: copied/annotated Class and declared Contract
+values lost supported metadata, and ordinary Object method reads acquired the
+method's return family without invocation. Both were corrected, with eight
+analysis and five real-stdio receiver-value regressions. The parent reran the
+full tools tests, build, strict Clippy and formatting successfully. Native
+ordinary- and empty-workspace suites also passed after rebuilding, including
+new Float64 class-copy and Object method-read versus call checks on both suffixes.
+The focused delta review returned APPROVE with high confidence after independently
+passing 34 targeted analysis/server tests. No remaining blocker was reported in
+that delta. Parent empty-workspace acceptance, strict Clippy and formatting checks
+also passed after the corrections. Physical typing, screenshots and Windows
+verification remain unavailable as described above.
+
+A subsequent full-suite run hit a stdio harness timeout in the Array completion
+test. Its isolated retry passed but took 42 seconds; another unchanged full-suite
+rerun passed with the builtin protocol suite back below one second. No timeout
+threshold was raised and no assertion was removed. The cause was not established;
+retain this as an intermittent test-process timing observation rather than a
+proven semantic failure or an environment diagnosis.
+
 ## Rich Hover And Signature Help
 
 This milestone adds parser-owned documentation attachments and call

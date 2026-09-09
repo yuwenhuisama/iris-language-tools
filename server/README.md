@@ -65,16 +65,23 @@ partially missing reference results. Completion on available sources marks
 ### Feature Behavior
 
 - **Signature Help**: `textDocument/signatureHelp` advertises `(`, `,`, and `:`
-  triggers and `)` retriggers. The current snapshot resolves the innermost source-defined
-  callable, preserving declared types, default expressions, discard slots, rest parameters,
-  keyword parameters, and attached documentation. Nested argument commas do not advance
-  outer slots. Trailing argument holes and incomplete EOF calls are supported where the
-  parser can retain safe call metadata. An unknown inner callee never falls back to an
-  outer signature; unknown callees or uncertain argument mappings return `null`.
-  One signature is returned with `activeSignature: 0` and a mapped top-level
-  `activeParameter`; zero-parameter calls omit the active parameter. The optional
-  per-signature `activeParameter` field is not used. Request context is decoded but
-  client-provided active signatures never override snapshot analysis.
+  triggers and `)` retriggers. The current snapshot resolves the innermost callable,
+  supporting source methods as well as cataloged built-in call shapes. Source callable
+  signatures preserve declared types, default expressions, discard slots, rest parameters,
+  keyword parameters, and attached documentation. For built-ins, call shapes present
+  neutral positional placeholders, evidenced keyword parameters, and backend availability
+  notes. Nested argument commas do not advance outer slots. Trailing argument holes and
+  incomplete EOF calls are supported where the parser can retain safe call metadata.
+  An unknown inner callee never falls back to an outer signature; unknown callees or
+  uncertain argument mappings return `null`.
+  When multiple candidate signatures exist (such as built-in variants), all candidates
+  are returned in `signatures`, with `activeSignature` pointing to the first
+  compatible shape in catalog order. Supplied argument channels and counts filter
+  incompatible shapes; inferred runtime types never select a variant.
+  Zero-parameter calls omit the active parameter.
+  When multiple candidates are returned, individual signatures carry their own
+  `activeParameter`. Request context is decoded but client-provided active signatures
+  never override snapshot analysis.
   Documentation format preferences are negotiated independently of hover, defaulting
   to plaintext. Markdown documentation uses the shared bounded literal renderer, escaping
   links, HTML, and punctuation without commands or trusted markup. Parameter labels are
@@ -83,11 +90,14 @@ partially missing reference results. Completion on available sources marks
   including when an earlier default contains astral characters. Requests produce no
   text edits and use the same 32-job queue, epoch/version/generation checks, cancellation,
   and unsaved cross-file overlays as other semantic queries.
-- **Hover**: Displays a statically resolved declaration signature and useful nonduplicate
-  type information. The exact UTF-16 range covers the hovered name in the requested
-  document, including for same-package cross-file targets. Unknown sources, unresolved
-  symbols, and unsafe syntax return `null`; requested-source inventory failures retain
-  their existing errors. Unsaved source and target edits invalidate cached results.
+- **Hover**: Displays a statically resolved declaration signature or built-in member
+  card with useful nonduplicate type information. For built-ins, hover cards display
+  the member signature, owner, return type when known, implementation evidence, and
+  backend availability across the reference evaluator and VM. The exact UTF-16 range
+  covers the hovered name in the requested document, including for same-package cross-file
+  targets. Unknown sources, unresolved symbols, and unsafe syntax return `null`;
+  requested-source inventory failures retain their existing errors. Unsaved source and
+  target edits invalidate cached results.
   The first client-preferred Markdown/plaintext format is selected; absent or empty
   preferences default to plaintext. Plaintext preserves the analysis signature's spacing
   and line breaks. Markdown escapes source punctuation, including backticks, links and
@@ -98,16 +108,19 @@ partially missing reference results. Completion on available sources marks
 - **Definition (`F12` / `Ctrl+Click`)**: Resolves symbols by snapshot declaration
   identity. Returns exact UTF-16 `Location[]` target ranges. Declaration spans
   separate the full declaration from the target name span. Unknown symbols return `[]`.
+  Built-in members without authored source declarations return `[]`, avoiding fake
+  source navigation.
 - **References (`Shift+F12`)**: Resolves static symbol occurrences across the
   same-package resolution group. Honor context flag `includeDeclaration`. References are
   statically resolved symbol bindings, not all possible dynamic runtime call targets.
   Unknown symbols return `[]`.
 - **Completion**: Provides in-scope variables, parameters, constants, source classes,
-  modules, contracts, type aliases, and known member completions on typed receivers.
-  Completion replacements span the cursor line without crossing line breaks. Ordinary
-  keywords are offered in general expression and statement contexts, but suppressed in
-  member access, namespace qualification, string literals, and comments. Unknown
-  documents fall back to the keyword baseline.
+  modules, contracts, type aliases, and known member completions on typed receivers,
+  including built-in instance, class, and service members. Completion replacements span
+  the cursor line without crossing line breaks. Ordinary keywords are offered in general
+  expression and statement contexts, but suppressed in member access, namespace
+  qualification, string literals, and comments. Unknown documents fall back to the
+  keyword baseline.
 - **Inlay Hints**: Displays local known types on bindings and literals without
   written annotations. Parameter and return annotations omitted from named methods
   remain `Dynamic<Object>` under `TYPES-C003`. Method bodies or default values do not
@@ -145,8 +158,10 @@ otherwise it is detached. No semantic child process is spawned per keystroke.
   cover disk target edits in both directions of mixed `.ir`/`.iris` packages and
   unsaved target overlays. Clients must register and send the notifications;
   workspace-folder changes also invalidate the semantic snapshot.
-- **Built-in members**: Completion covers source-defined symbols and known
-  source-defined members. Built-in Integer/String member surfaces are not indexed.
+- **Built-in members**: Member completion, hover, and signature help index built-in
+  instance, class, service, and global surfaces via `iris-builtins`. Unknown receivers,
+  refusal-only routes (e.g. `File.read_text`), internal test fixtures (e.g. `NativeFixture`,
+  `Array.share_count`), and unindexed arbitrary types do not produce guessed built-in members.
 
 ## Formatting
 
