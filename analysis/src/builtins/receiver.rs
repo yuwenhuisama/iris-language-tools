@@ -118,6 +118,7 @@ impl AnalysisSnapshot {
             }
         }
         match self.expression_type(key, depth + 1)? {
+            TypeFact::ArrayOf(_) => Some(BuiltinReceiver::Instance(BuiltinType::Array)),
             TypeFact::Literal(name) => BuiltinType::from_name(name).map(BuiltinReceiver::Instance),
             TypeFact::Builtin { kind, .. } => Some(BuiltinReceiver::Instance(kind)),
             TypeFact::BuiltinClass(owner) => Some(BuiltinReceiver::Named {
@@ -132,7 +133,7 @@ impl AnalysisSnapshot {
                 }
                 self.nominal_builtin_receiver(owner)
             }
-            TypeFact::Written { .. } | TypeFact::Instance(_) => None,
+            TypeFact::Nullable(_) | TypeFact::Written { .. } | TypeFact::Instance(_) => None,
         }
     }
 

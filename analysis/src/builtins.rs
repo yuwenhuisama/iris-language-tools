@@ -87,6 +87,7 @@ impl AnalysisSnapshot {
         }
         let kind = match member.result {
             ReturnFact::Unknown => return None,
+            ReturnFact::ArrayOf(element) => return Some(TypeFact::ArrayOf(element)),
             ReturnFact::Known(kind) => kind,
             ReturnFact::Receiver => member.receiver?,
         };

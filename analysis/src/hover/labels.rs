@@ -126,6 +126,7 @@ impl AnalysisSnapshot {
                 )
             }
             ExpressionFact::Literal { .. }
+            | ExpressionFact::Index { .. }
             | ExpressionFact::Array { .. }
             | ExpressionFact::Tuple { .. }
             | ExpressionFact::Hash { .. }
@@ -165,6 +166,7 @@ impl AnalysisSnapshot {
         )?;
         let owner = match fact {
             TypeFact::Instance(owner) => owner,
+            TypeFact::ArrayOf(_) | TypeFact::Nullable(_) => return self.type_label(fact),
             TypeFact::Builtin { label, .. } => return Some(label),
             TypeFact::Literal(_)
             | TypeFact::Written { .. }

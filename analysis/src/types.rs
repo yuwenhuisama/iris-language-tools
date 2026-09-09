@@ -4,6 +4,8 @@ use iris_syntax::TypeExpression;
 
 #[derive(Clone, Debug)]
 pub enum TypeFact {
+    ArrayOf(iris_builtins::BuiltinType),
+    Nullable(iris_builtins::BuiltinType),
     BuiltinClass(&'static str),
     Builtin {
         kind: iris_builtins::BuiltinType,
@@ -24,6 +26,9 @@ impl AnalysisSnapshot {
         let SourceKind::Type(annotation) = &node.kind else {
             return None;
         };
+        if let Some(element) = self.array_annotation_element(key, annotation) {
+            return Some(TypeFact::ArrayOf(element));
+        }
         match annotation {
             TypeExpression::Name(_) => {
                 let names: Vec<_> = node
@@ -87,6 +92,9 @@ impl AnalysisSnapshot {
             return None;
         };
         match expression {
+            ExpressionFact::Index { receiver, index } => {
+                self.array_index_type(key, (*receiver, *index), depth + 1)
+            }
             ExpressionFact::Array { .. } => Some(TypeFact::Literal("Array")),
             ExpressionFact::Tuple { .. } => Some(TypeFact::Literal("Tuple")),
             ExpressionFact::Hash { .. } => Some(TypeFact::Literal("Hash")),
@@ -215,6 +223,8 @@ impl AnalysisSnapshot {
 
     pub(crate) fn type_label(&self, fact: TypeFact) -> Option<String> {
         match fact {
+            TypeFact::ArrayOf(element) => Some(element.array_name().to_owned()),
+            TypeFact::Nullable(element) => Some(format!("{}?", element.name())),
             TypeFact::Literal(label) => Some(label.to_owned()),
             TypeFact::Written { label } | TypeFact::Builtin { label, .. } => Some(label),
             TypeFact::Instance(key) => Some(self.symbol(key)?.qualified.as_ref()?.join("::")),

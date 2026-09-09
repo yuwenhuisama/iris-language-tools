@@ -3,6 +3,7 @@
 //! Coordinates are half-open UTF-8 byte spans. File and group identity belong to
 //! the host; this crate neither opens files nor discovers package dependencies.
 
+mod array_types;
 mod binding_types;
 mod builtins;
 mod completion;
