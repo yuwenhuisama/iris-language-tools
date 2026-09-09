@@ -87,7 +87,21 @@ fn completes_requests_when_format_worker_is_stalled() {
         "textDocument":{"uri":"untitled:worker"},"position":{"line":0,"character":0}}}));
     let response = client.response();
     assert_eq!(response["id"], 3);
-    assert_eq!(response["result"].as_array().unwrap().len(), 50);
+    let result: lsp_types::CompletionList =
+        serde_json::from_value(response["result"].clone()).unwrap();
+    assert!(!result.is_incomplete);
+    assert_eq!(
+        result
+            .items
+            .iter()
+            .filter(|item| item.kind == Some(lsp_types::CompletionItemKind::KEYWORD))
+            .count(),
+        50
+    );
+    assert!(
+        result.items.iter().any(|item| item.label == "String"
+            && item.kind == Some(lsp_types::CompletionItemKind::CLASS))
+    );
 }
 
 #[test]

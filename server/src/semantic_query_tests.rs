@@ -29,7 +29,8 @@ fn marks_keyword_response_incomplete_when_workspace_inventory_is_partial() {
         id: FileId(0),
         group: GroupId(0),
         text,
-    }]);
+    }])
+    .with_incomplete_groups([GroupId(0)]);
     let keywords = [CompletionItem {
         label: "let".into(),
         kind: Some(lsp_types::CompletionItemKind::KEYWORD),

@@ -275,10 +275,15 @@ dependencies = [
 name = "iris-analysis"
 version = "0.1.0"
 dependencies = [
+ "iris-builtins",
  "iris-lexer",
  "iris-parser",
  "iris-syntax",
 ]
+
+[[package]]
+name = "iris-builtins"
+version = "0.1.0"
 
 [[package]]
 name = "iris-formatter"

@@ -91,12 +91,13 @@ pub struct DocumentationInfo {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SignatureHelpInfo {
-    pub signature: SignatureInfo,
-    pub active_parameter: Option<usize>,
+    pub signatures: Vec<SignatureInfo>,
+    pub active_signature: usize,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SignatureInfo {
+    pub active_parameter: Option<usize>,
     pub label: String,
     pub parameters: Vec<SignatureParameterInfo>,
     pub docs: Option<DocumentationInfo>,

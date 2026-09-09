@@ -16,13 +16,7 @@ impl AnalysisSnapshot {
             is_incomplete: !document.source.recovery.is_empty(),
             allow_keywords: false,
         };
-        if document.source.nodes.is_empty()
-            && document
-                .source
-                .recovery
-                .iter()
-                .any(|region| region.code.starts_with("LEX_"))
-        {
+        if document.failed_lexing() {
             result.allow_keywords = document.reliable_keyword_prefix(byte);
             return result;
         }
@@ -32,25 +26,22 @@ impl AnalysisSnapshot {
         let replace = document.replacement(byte);
         let prefix = &document.input.text[replace.start..byte];
         let mut keys = Vec::new();
-        let mut member_context = false;
-        for node in &document.source.nodes {
-            let receiver = match &node.kind {
-                SourceKind::Expression(ExpressionFact::Member {
-                    receiver,
-                    name,
-                    contract,
-                }) if name.span.start <= byte && byte <= name.span.end => {
-                    member_context = true;
-                    if *contract { None } else { Some(*receiver) }
-                }
-                SourceKind::Expression(ExpressionFact::IncompleteMember { receiver, dot })
-                    if dot.end <= byte && document.input.text[dot.end..byte].trim().is_empty() =>
-                {
-                    member_context = true;
-                    Some(*receiver)
-                }
-                _ => None,
-            };
+        let receivers = document.completion_receivers(byte);
+        let mut member_context = !receivers.is_empty();
+        for receiver in receivers {
+            if let Some(receiver) = receiver {
+                result.items.extend(
+                    self.builtin_member_completions(
+                        Key {
+                            file,
+                            node: receiver,
+                        },
+                        replace,
+                    )
+                    .into_iter()
+                    .filter(|item| item.label.starts_with(prefix)),
+                );
+            }
             if let Some(receiver) = receiver.and_then(|receiver| {
                 self.receiver(
                     Key {
@@ -75,8 +66,18 @@ impl AnalysisSnapshot {
         if let Some(qualified) = self.qualified_completions(cursor) {
             member_context = true;
             keys.extend(qualified);
+            result.items.extend(
+                self.builtin_qualified_completions(cursor, replace)
+                    .into_iter()
+                    .filter(|item| item.label.starts_with(prefix)),
+            );
         }
         if !member_context {
+            result.items.extend(
+                self.builtin_name_completions(cursor, replace)
+                    .into_iter()
+                    .filter(|item| item.label.starts_with(prefix)),
+            );
             result.allow_keywords = document.keyword_context(byte);
             for label in self.completion_labels(file) {
                 if !label.starts_with(prefix) {
@@ -156,6 +157,36 @@ impl AnalysisSnapshot {
 }
 
 impl crate::Document {
+    fn failed_lexing(&self) -> bool {
+        self.source.nodes.is_empty()
+            && self
+                .source
+                .recovery
+                .iter()
+                .any(|region| region.code.starts_with("LEX_"))
+    }
+    fn completion_receivers(&self, byte: usize) -> Vec<Option<iris_parser::source::SyntaxId>> {
+        self.source
+            .nodes
+            .iter()
+            .filter_map(|node| match &node.kind {
+                SourceKind::Expression(ExpressionFact::Member {
+                    receiver,
+                    name,
+                    contract,
+                }) if name.span.start <= byte && byte <= name.span.end => {
+                    Some((!*contract).then_some(*receiver))
+                }
+                SourceKind::Expression(ExpressionFact::IncompleteMember { receiver, dot })
+                    if dot.end <= byte && self.input.text[dot.end..byte].trim().is_empty() =>
+                {
+                    Some(Some(*receiver))
+                }
+                _ => None,
+            })
+            .collect()
+    }
+
     fn replacement(&self, byte: usize) -> Span {
         self.source
             .nodes

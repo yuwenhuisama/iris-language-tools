@@ -33,8 +33,11 @@ fn signature_and_hover_when_imported_target_changes_in_dirty_snapshot() {
     assert_eq!(when.type_label.as_deref(), Some("Bool"));
     assert_eq!(updated.signature_help(FileId(1), caller.len()), None);
     let original = given.signature_help(FileId(1), caller.len()).unwrap();
-    assert_eq!(original.signature.docs.unwrap().text, "Original");
-    assert_eq!(original.signature.parameters[0].name, "value");
+    assert_eq!(
+        original.signatures[0].docs.as_ref().unwrap().text,
+        "Original"
+    );
+    assert_eq!(original.signatures[0].parameters[0].name, "value");
 }
 
 #[test]

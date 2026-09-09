@@ -33,10 +33,12 @@ impl AnalysisSnapshot {
                     },
                 )?;
                 match symbol.declaration.parameter_category {
-                    Some(ParameterCategory::Rest) => Some(TypeFact::Written {
+                    Some(ParameterCategory::Rest) => Some(TypeFact::Builtin {
+                        kind: iris_builtins::BuiltinType::from_name("Array")?,
                         label: format!("Array<{}>", self.type_label(element)?),
                     }),
-                    Some(ParameterCategory::KeywordRest) => Some(TypeFact::Written {
+                    Some(ParameterCategory::KeywordRest) => Some(TypeFact::Builtin {
+                        kind: iris_builtins::BuiltinType::from_name("Hash")?,
                         label: format!("Hash<Symbol, {}>", self.type_label(element)?),
                     }),
                     Some(
@@ -61,6 +63,9 @@ impl AnalysisSnapshot {
                         file: key.file,
                         node,
                     });
+                }
+                if symbol.declaration.modifiers.mutable {
+                    return None;
                 }
                 match symbol.declaration.kind {
                     DeclarationKind::Binding | DeclarationKind::Constant => self.expression_type(

@@ -24,7 +24,7 @@ fn assert_resource_limit(client: &Client, publication: &Value, version: i32) {
     );
 }
 
-fn assert_completion(client: &mut Client) {
+fn assert_completion(client: &mut Client, builtins_available: bool) {
     client.send(
         &json!({"jsonrpc":"2.0","id":2,"method":"textDocument/completion",
         "params":{"textDocument":{"uri":"untitled:lexer-recursion"},
@@ -32,11 +32,24 @@ fn assert_completion(client: &mut Client) {
     );
     let response = client.receive();
     assert_eq!(response["id"], 2);
-    let labels: Vec<_> = response["result"]
-        .as_array()
-        .unwrap()
+    let completion: lsp_types::CompletionResponse =
+        serde_json::from_value(response["result"].clone()).unwrap();
+    let items = match completion {
+        lsp_types::CompletionResponse::Array(items) => items,
+        lsp_types::CompletionResponse::List(list) => {
+            assert!(!list.is_incomplete);
+            list.items
+        }
+    };
+    assert_eq!(
+        items.iter().any(|item| item.label == "String"
+            && item.kind == Some(lsp_types::CompletionItemKind::CLASS)),
+        builtins_available
+    );
+    let labels: Vec<_> = items
         .iter()
-        .map(|item| item["label"].as_str().unwrap())
+        .filter(|item| item.kind == Some(lsp_types::CompletionItemKind::KEYWORD))
+        .map(|item| item.label.as_str())
         .collect();
     let expected: Vec<String> =
         serde_json::from_str(include_str!("../../language/keywords.json")).unwrap();
@@ -56,7 +69,7 @@ fn remains_responsive_when_did_open_contains_deep_interpolation() {
     let publication = client.open("untitled:lexer-recursion", &source);
 
     assert_resource_limit(&client, &publication, 1);
-    assert_completion(&mut client);
+    assert_completion(&mut client, false);
     client.shutdown();
 }
 
@@ -77,7 +90,7 @@ fn remains_responsive_when_did_change_contains_deep_interpolation() {
     );
 
     assert_resource_limit(&client, &client.receive(), 2);
-    assert_completion(&mut client);
+    assert_completion(&mut client, false);
     client.send(
         &json!({"jsonrpc":"2.0","method":"textDocument/didChange","params":{
         "textDocument":{"uri":"untitled:lexer-recursion","version":3},
@@ -86,6 +99,6 @@ fn remains_responsive_when_did_change_contains_deep_interpolation() {
     let repaired = client.receive();
     assert_eq!(repaired["params"]["version"], 3);
     assert_eq!(repaired["params"]["diagnostics"], json!([]));
-    assert_completion(&mut client);
+    assert_completion(&mut client, true);
     client.shutdown();
 }

@@ -12,13 +12,14 @@ fn snapshot(text: &str) -> AnalysisSnapshot {
 fn signature_when_parameters_include_discard_defaults_and_channels() {
     let text = "module Main {\n/// Read docs\npublic fun read<T>(_, value = '😀', *rest: T, key option = true, **kwargs, &block) -> String {}\nread(1, 2) }";
     let given = snapshot(text);
-    let when = given
+    let help = given
         .signature_help(FileId(1), text.rfind("2)").unwrap())
         .unwrap();
+    let when = &help.signatures[help.active_signature];
     assert_eq!(when.active_parameter, Some(1));
-    assert_eq!(when.signature.docs.unwrap().text, "Read docs");
-    assert_eq!(when.signature.parameters.len(), 6);
-    for (parameter, expected) in when.signature.parameters.iter().zip([
+    assert_eq!(when.docs.as_ref().unwrap().text, "Read docs");
+    assert_eq!(when.parameters.len(), 6);
+    for (parameter, expected) in when.parameters.iter().zip([
         "_: Dynamic<Object>",
         "value: Dynamic<Object> = '😀'",
         "*rest: T",
@@ -27,18 +28,15 @@ fn signature_when_parameters_include_discard_defaults_and_channels() {
         "&block: Dynamic<Object>",
     ]) {
         assert_eq!(
-            &when.signature.label[parameter.label.start..parameter.label.end],
+            &when.label[parameter.label.start..parameter.label.end],
             expected
         );
     }
-    assert_eq!(
-        when.signature.parameters[2].category,
-        ParameterCategory::Rest
-    );
+    assert_eq!(when.parameters[2].category, ParameterCategory::Rest);
     let hover = given
         .hover(FileId(1), text.find("read<T>").unwrap())
         .unwrap();
-    assert_eq!(when.signature.label, hover.signature);
+    assert_eq!(when.label, hover.signature);
 }
 
 #[test]
@@ -53,7 +51,11 @@ fn active_parameter_when_keyword_and_rest_channels_are_mixed() {
         );
         let given = snapshot(&text);
         let when = given.signature_help(FileId(1), text.len()).unwrap();
-        assert_eq!(when.active_parameter, Some(active), "{call}");
+        assert_eq!(
+            when.signatures[when.active_signature].active_parameter,
+            Some(active),
+            "{call}"
+        );
     }
 }
 
@@ -68,7 +70,11 @@ fn signature_when_editor_call_is_incomplete() {
         let text = format!("module Main {{ public fun read(value, second, key option) {{}} {call}");
         let given = snapshot(&text);
         let when = given.signature_help(FileId(1), text.len()).unwrap();
-        assert_eq!(when.active_parameter, Some(active), "{call}");
+        assert_eq!(
+            when.signatures[when.active_signature].active_parameter,
+            Some(active),
+            "{call}"
+        );
     }
 }
 
@@ -77,8 +83,8 @@ fn innermost_call_when_outer_and_inner_are_incomplete() {
     let text = "module Main { public fun outer(a,b) {} public fun inner(value) {} outer(1, inner(";
     let given = snapshot(text);
     let when = given.signature_help(FileId(1), text.len()).unwrap();
-    assert!(when.signature.label.contains("inner("));
-    assert_eq!(when.active_parameter, Some(0));
+    assert!(when.signatures[0].label.contains("inner("));
+    assert_eq!(when.signatures[0].active_parameter, Some(0));
 }
 
 #[test]
@@ -96,8 +102,8 @@ fn signature_has_no_active_parameter_when_method_has_no_parameters() {
     let when = given
         .signature_help(FileId(1), text.rfind("read(").unwrap() + 5)
         .unwrap();
-    assert_eq!(when.active_parameter, None);
-    assert!(when.signature.parameters.is_empty());
+    assert_eq!(when.signatures[0].active_parameter, None);
+    assert!(when.signatures[0].parameters.is_empty());
 }
 
 #[test]
@@ -117,7 +123,7 @@ fn outer_slot_when_nested_literals_and_comments_contain_commas() {
     let when = given
         .signature_help(FileId(1), text.rfind("3)").unwrap())
         .unwrap();
-    assert_eq!(when.active_parameter, Some(2));
+    assert_eq!(when.signatures[0].active_parameter, Some(2));
 }
 
 #[test]

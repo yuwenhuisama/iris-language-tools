@@ -144,7 +144,15 @@ fn completion_preserves_receiver_kind_when_headers_or_rest_annotations_are_prese
             let expected = if scenario.instance {
                 vec!["read"]
             } else {
-                vec![]
+                match scenario.copy_type {
+                    Some("Array<Box>" | "Array<Dynamic<Object>>") => {
+                        vec!["reduce", "reject", "respond_to?", "reverse"]
+                    }
+                    Some("Hash<Symbol, Box>" | "Hash<Symbol, Dynamic<Object>>") => {
+                        vec!["rehash", "respond_to?"]
+                    }
+                    Some(_) | None => vec![],
+                }
             };
             assert_eq!(labels, expected, "{}", scenario.text);
         }

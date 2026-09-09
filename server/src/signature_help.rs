@@ -40,8 +40,8 @@ impl Options {
 }
 
 pub fn render(info: SignatureHelpInfo, options: Options) -> Option<SignatureHelp> {
-    let signature = info.signature;
-    let active_parameter = match info.active_parameter {
+    let signature = info.signatures.get(info.active_signature)?;
+    let active_parameter = match signature.active_parameter {
         Some(index) => {
             signature.parameters.get(index)?;
             Some(u32::try_from(index).ok()?)
@@ -49,38 +49,57 @@ pub fn render(info: SignatureHelpInfo, options: Options) -> Option<SignatureHelp
         None if signature.parameters.is_empty() => None,
         None => return None,
     };
-    let parameters = signature
-        .parameters
-        .iter()
-        .map(|parameter| {
-            let span = parameter.label;
-            let text = signature.label.get(span.start..span.end)?;
-            let label = if options.label_offsets {
-                let start = signature.label.get(..span.start)?.encode_utf16().count();
-                let end = start.checked_add(text.encode_utf16().count())?;
-                ParameterLabel::LabelOffsets([u32::try_from(start).ok()?, u32::try_from(end).ok()?])
-            } else {
-                ParameterLabel::Simple(text.into())
-            };
-            Some(ParameterInformation {
-                label,
-                documentation: parameter.docs.as_ref().map(|docs| {
+    let multiple = info.signatures.len() > 1;
+    let signatures = info
+        .signatures
+        .into_iter()
+        .map(|signature| {
+            if signature.active_parameter.is_none() && !signature.parameters.is_empty() {
+                return None;
+            }
+            let parameters = signature
+                .parameters
+                .iter()
+                .map(|parameter| {
+                    let span = parameter.label;
+                    let text = signature.label.get(span.start..span.end)?;
+                    let label = if options.label_offsets {
+                        let start = signature.label.get(..span.start)?.encode_utf16().count();
+                        let end = start.checked_add(text.encode_utf16().count())?;
+                        ParameterLabel::LabelOffsets([
+                            u32::try_from(start).ok()?,
+                            u32::try_from(end).ok()?,
+                        ])
+                    } else {
+                        ParameterLabel::Simple(text.into())
+                    };
+                    Some(ParameterInformation {
+                        label,
+                        documentation: parameter.docs.as_ref().map(|docs| {
+                            Documentation::MarkupContent(hover::render_docs(docs, options.format))
+                        }),
+                    })
+                })
+                .collect::<Option<Vec<_>>>()?;
+            Some(SignatureInformation {
+                label: signature.label,
+                documentation: signature.docs.as_ref().map(|docs| {
                     Documentation::MarkupContent(hover::render_docs(docs, options.format))
                 }),
+                parameters: Some(parameters),
+                active_parameter: match signature.active_parameter.filter(|_| multiple) {
+                    Some(index) => {
+                        signature.parameters.get(index)?;
+                        Some(u32::try_from(index).ok()?)
+                    }
+                    None => None,
+                },
             })
         })
         .collect::<Option<Vec<_>>>()?;
     Some(SignatureHelp {
-        signatures: vec![SignatureInformation {
-            label: signature.label,
-            documentation: signature
-                .docs
-                .as_ref()
-                .map(|docs| Documentation::MarkupContent(hover::render_docs(docs, options.format))),
-            parameters: Some(parameters),
-            active_parameter: None,
-        }],
-        active_signature: Some(0),
+        signatures,
+        active_signature: Some(u32::try_from(info.active_signature).ok()?),
         active_parameter,
     })
 }

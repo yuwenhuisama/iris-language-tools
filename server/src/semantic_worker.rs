@@ -177,11 +177,17 @@ fn execute(
                 text: Arc::clone(&file.text),
             });
         }
+        let incomplete_groups = if snapshot.is_complete() {
+            Vec::new()
+        } else {
+            sources.iter().map(|source| source.group).collect()
+        };
         let analysis = AnalysisSnapshot::new(
             sources
                 .into_iter()
                 .take_while(|_| !job.cancelled.load(Ordering::Relaxed)),
-        );
+        )
+        .with_incomplete_groups(incomplete_groups);
         check_cancelled(job)?;
         *cache = Some(Cache {
             epoch: job.inputs.epoch,

@@ -37,7 +37,10 @@ impl AnalysisSnapshot {
                 };
                 Some(Receiver { owner, surface })
             }
-            TypeFact::Written { .. } | TypeFact::Literal(_) => None,
+            TypeFact::Written { .. }
+            | TypeFact::Literal(_)
+            | TypeFact::Builtin { .. }
+            | TypeFact::BuiltinClass(_) => None,
         }
     }
 

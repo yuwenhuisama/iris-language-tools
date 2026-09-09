@@ -4,6 +4,7 @@
 //! the host; this crate neither opens files nor discovers package dependencies.
 
 mod binding_types;
+mod builtins;
 mod completion;
 mod hints;
 mod hover;
@@ -20,7 +21,7 @@ mod types;
 pub use model::*;
 
 use iris_parser::source::SourceDocument;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Debug)]
 struct Document {
@@ -33,6 +34,7 @@ struct Document {
 pub struct AnalysisSnapshot {
     documents: BTreeMap<FileId, Document>,
     symbols: Vec<index::Symbol>,
+    incomplete_groups: BTreeSet<GroupId>,
 }
 
 impl AnalysisSnapshot {
@@ -62,8 +64,17 @@ impl AnalysisSnapshot {
         let mut snapshot = Self {
             documents,
             symbols: Vec::new(),
+            incomplete_groups: BTreeSet::new(),
         };
         snapshot.symbols = snapshot.collect_symbols();
         snapshot
+    }
+
+    /// Mark host-selected groups with missing source inventory. Builtin assistance
+    /// is suppressed for these groups without reparsing or discarding source facts.
+    #[must_use]
+    pub fn with_incomplete_groups(mut self, groups: impl IntoIterator<Item = GroupId>) -> Self {
+        self.incomplete_groups.extend(groups);
+        self
     }
 }

@@ -19,7 +19,39 @@ fn members_distinguish_class_surface_when_receiver_is_class_object() {
             .iter()
             .map(|item| item.label.as_str())
             .collect::<Vec<_>>(),
-        ["build"]
+        [
+            "active_revision",
+            "add_module",
+            "alias_method",
+            "ancestors",
+            "build",
+            "contracts",
+            "decorator_arguments",
+            "decorator_phases",
+            "decorators",
+            "define_method",
+            "define_property",
+            "denied_capabilities",
+            "invoke",
+            "meta_capabilities",
+            "method",
+            "methods",
+            "modules",
+            "mro",
+            "name",
+            "new",
+            "open",
+            "package",
+            "properties",
+            "remove_contract",
+            "remove_method",
+            "remove_module",
+            "runtime_superclass",
+            "set_superclass",
+            "static_spine",
+            "type",
+            "undef_method"
+        ]
     );
 }
 

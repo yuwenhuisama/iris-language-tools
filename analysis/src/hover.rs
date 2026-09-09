@@ -18,7 +18,9 @@ impl AnalysisSnapshot {
             .occurrences(file)
             .into_iter()
             .filter(|(span, _, _)| span.start <= byte && byte < span.end);
-        let (span, key, _) = matches.next()?;
+        let Some((span, key, _)) = matches.next() else {
+            return self.builtin_hover(file, byte);
+        };
         if matches.any(|(other_span, other_key, _)| other_span != span || other_key != key) {
             return None;
         }
@@ -60,6 +62,7 @@ impl AnalysisSnapshot {
             return None;
         }
         Some(crate::SignatureInfo {
+            active_parameter: None,
             label: output.finish(),
             parameters,
             docs: self.documentation(key),

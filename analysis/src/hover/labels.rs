@@ -125,7 +125,11 @@ impl AnalysisSnapshot {
                     depth,
                 )
             }
-            ExpressionFact::Literal { .. } => self.type_label(self.expression_type(key, depth)?),
+            ExpressionFact::Literal { .. }
+            | ExpressionFact::Array { .. }
+            | ExpressionFact::Tuple { .. }
+            | ExpressionFact::Hash { .. }
+            | ExpressionFact::Range { .. } => self.type_label(self.expression_type(key, depth)?),
             ExpressionFact::IncompleteMember { .. }
             | ExpressionFact::Assignment { .. }
             | ExpressionFact::Construction { .. }
@@ -152,15 +156,20 @@ impl AnalysisSnapshot {
             return self.hover_label(method, depth + 1);
         }
         let parent: SyntaxId = self.documents[&callee.file].parents[callee.node.0]?;
-        let TypeFact::Instance(owner) = self.expression_type(
+        let fact = self.expression_type(
             Key {
                 node: parent,
                 ..callee
             },
             depth,
-        )?
-        else {
-            return None;
+        )?;
+        let owner = match fact {
+            TypeFact::Instance(owner) => owner,
+            TypeFact::Builtin { label, .. } => return Some(label),
+            TypeFact::Literal(_)
+            | TypeFact::Written { .. }
+            | TypeFact::Object(_)
+            | TypeFact::BuiltinClass(_) => return None,
         };
         let mut label = BoundedText::new(1024);
         for (index, segment) in self.symbol(owner)?.qualified.as_ref()?.iter().enumerate() {

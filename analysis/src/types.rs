@@ -4,8 +4,15 @@ use iris_syntax::TypeExpression;
 
 #[derive(Clone, Debug)]
 pub enum TypeFact {
+    BuiltinClass(&'static str),
+    Builtin {
+        kind: iris_builtins::BuiltinType,
+        label: String,
+    },
     Literal(&'static str),
-    Written { label: String },
+    Written {
+        label: String,
+    },
     Instance(Key),
     Object(Key),
 }
@@ -52,11 +59,23 @@ impl AnalysisSnapshot {
             | TypeExpression::Union(_)
             | TypeExpression::Function { .. } => {}
         }
-        Some(TypeFact::Written {
-            label: document.input.text[node.span.start..node.span.end]
-                .trim()
-                .to_owned(),
-        })
+        let label = document.input.text[node.span.start..node.span.end]
+            .trim()
+            .to_owned();
+        let name = match annotation {
+            TypeExpression::Name(name) | TypeExpression::Generic { name, .. } => Some(name),
+            TypeExpression::Typeof(_)
+            | TypeExpression::Intersection(_)
+            | TypeExpression::Union(_)
+            | TypeExpression::Function { .. } => None,
+        };
+        if let Some(name) = name
+            && self.builtin_name_available(self.node_cursor(key), name.split("::").next()?)
+            && let Some(kind) = iris_builtins::BuiltinType::from_name(name)
+        {
+            return Some(TypeFact::Builtin { kind, label });
+        }
+        Some(TypeFact::Written { label })
     }
 
     pub(crate) fn expression_type(&self, key: Key, depth: usize) -> Option<TypeFact> {
@@ -68,6 +87,10 @@ impl AnalysisSnapshot {
             return None;
         };
         match expression {
+            ExpressionFact::Array { .. } => Some(TypeFact::Literal("Array")),
+            ExpressionFact::Tuple { .. } => Some(TypeFact::Literal("Tuple")),
+            ExpressionFact::Hash { .. } => Some(TypeFact::Literal("Hash")),
+            ExpressionFact::Range { .. } => Some(TypeFact::Literal("Range")),
             ExpressionFact::Literal { text, kind } => Some(TypeFact::Literal(match kind {
                 LiteralKind::Integer => "Integer",
                 LiteralKind::Float => {
@@ -98,7 +121,10 @@ impl AnalysisSnapshot {
                         }
                     });
                 }
-                self.binding_type(self.path(self.node_cursor(key), path)?, depth + 1)
+                self.path(self.node_cursor(key), path).map_or_else(
+                    || self.builtin_value_type(key, path),
+                    |binding| self.binding_type(binding, depth + 1),
+                )
             }
             ExpressionFact::Grouped { value } => self.expression_type(
                 Key {
@@ -107,9 +133,10 @@ impl AnalysisSnapshot {
                 },
                 depth + 1,
             ),
-            ExpressionFact::Member { .. } => {
-                self.binding_type(self.expression_symbol(key, depth + 1)?, depth + 1)
-            }
+            ExpressionFact::Member { .. } => self.expression_symbol(key, depth + 1).map_or_else(
+                || self.builtin_result(key, depth + 1),
+                |target| self.binding_type(target, depth + 1),
+            ),
             ExpressionFact::Call {
                 callee,
                 type_arguments,
@@ -127,10 +154,10 @@ impl AnalysisSnapshot {
                 )
             }
             ExpressionFact::IncompleteMember { .. }
+            | ExpressionFact::Closure { .. }
             | ExpressionFact::Assignment { .. }
             | ExpressionFact::Construction { .. }
             | ExpressionFact::ReifiedType { .. }
-            | ExpressionFact::Closure { .. }
             | ExpressionFact::KeywordArgument { .. }
             | ExpressionFact::Unsupported { .. } => None,
         }
@@ -165,7 +192,9 @@ impl AnalysisSnapshot {
         {
             return Some(TypeFact::Instance(owner));
         }
-        let method = self.expression_symbol(callee_key, depth + 1)?;
+        let Some(method) = self.expression_symbol(callee_key, depth + 1) else {
+            return self.builtin_result(callee_key, depth + 1);
+        };
         let symbol = self.symbol(method)?;
         if symbol.declaration.kind != DeclarationKind::Method
                     || symbol.declaration.modifiers.asynchronous
@@ -187,9 +216,9 @@ impl AnalysisSnapshot {
     pub(crate) fn type_label(&self, fact: TypeFact) -> Option<String> {
         match fact {
             TypeFact::Literal(label) => Some(label.to_owned()),
-            TypeFact::Written { label } => Some(label),
+            TypeFact::Written { label } | TypeFact::Builtin { label, .. } => Some(label),
             TypeFact::Instance(key) => Some(self.symbol(key)?.qualified.as_ref()?.join("::")),
-            TypeFact::Object(_) => None,
+            TypeFact::Object(_) | TypeFact::BuiltinClass(_) => None,
         }
     }
 }

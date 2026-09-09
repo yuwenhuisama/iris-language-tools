@@ -13,7 +13,7 @@ fn empty_signature_when_editor_has_only_open_parenthesis() {
     let text = "module Main { fun read() {} read(";
     let given = snapshot(text);
     let when = given.signature_help(FileId(1), text.len()).unwrap();
-    assert_eq!(when.active_parameter, None);
+    assert_eq!(when.signatures[0].active_parameter, None);
 }
 
 #[test]
@@ -29,7 +29,7 @@ fn positional_mapping_when_parameters_follow_channel_order() {
     let text = "module Main { fun read(value, *rest, key option, &block) {} read(1, 2";
     let given = snapshot(text);
     let when = given.signature_help(FileId(1), text.len()).unwrap();
-    assert_eq!(when.active_parameter, Some(1));
+    assert_eq!(when.signatures[0].active_parameter, Some(1));
 }
 
 #[test]
@@ -40,7 +40,7 @@ fn hole_mapping_when_cursor_is_in_trivia_before_boundary() {
         let when = given
             .signature_help(FileId(1), text.rfind(',').unwrap() + 2)
             .unwrap();
-        assert_eq!(when.active_parameter, Some(1), "{suffix}");
+        assert_eq!(when.signatures[0].active_parameter, Some(1), "{suffix}");
     }
 }
 
@@ -87,8 +87,8 @@ fn inner_complete_call_when_cursor_precedes_inner_closer() {
     let when = given
         .signature_help(FileId(1), text.rfind("2)").unwrap() + 1)
         .unwrap();
-    assert!(when.signature.label.contains("inner("));
-    assert_eq!(when.active_parameter, Some(0));
+    assert!(when.signatures[0].label.contains("inner("));
+    assert_eq!(when.signatures[0].active_parameter, Some(0));
 }
 
 #[test]
@@ -96,7 +96,7 @@ fn editor_keyword_when_reserved_name_is_retained_as_damaged_slot() {
     let text = "module Main { fun read(**options) {} read(key:";
     let given = snapshot(text);
     let when = given.signature_help(FileId(1), text.len()).unwrap();
-    assert_eq!(when.active_parameter, Some(0));
+    assert_eq!(when.signatures[0].active_parameter, Some(0));
 }
 
 #[test]
@@ -107,8 +107,8 @@ fn nested_partial_expression_when_only_inner_argument_is_damaged() {
     let when = given
         .signature_help(FileId(1), text.rfind("))").unwrap())
         .unwrap();
-    assert!(when.signature.label.contains("inner("));
-    assert_eq!(when.active_parameter, Some(0));
+    assert!(when.signatures[0].label.contains("inner("));
+    assert_eq!(when.signatures[0].active_parameter, Some(0));
 }
 
 #[test]
@@ -119,11 +119,12 @@ fn prefix_queries_when_source_contains_astral_defaults_are_safe() {
         for byte in 0..=end {
             let when = given.signature_help(FileId(1), byte);
             if let Some(help) = when {
+                let signature = &help.signatures[help.active_signature];
                 assert!(text.is_char_boundary(byte));
-                assert!(help.signature.label.len() <= 4096);
-                for parameter in help.signature.parameters {
+                assert!(signature.label.len() <= 4096);
+                for parameter in &signature.parameters {
                     assert!(
-                        help.signature
+                        signature
                             .label
                             .get(parameter.label.start..parameter.label.end)
                             .is_some()
@@ -182,6 +183,10 @@ fn method_queries_remain_usable_when_only_body_or_call_is_incomplete() {
         );
         assert!(when.0.is_some(), "declaration: {text}");
         assert!(when.1.is_some(), "call: {text}");
-        assert_eq!(when.2.unwrap().active_parameter, Some(1), "{text}");
+        assert_eq!(
+            when.2.unwrap().signatures[0].active_parameter,
+            Some(1),
+            "{text}"
+        );
     }
 }

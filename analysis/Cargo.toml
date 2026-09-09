@@ -6,6 +6,7 @@ rust-version.workspace = true
 publish = false
 
 [dependencies]
+iris-builtins.workspace = true
 iris-lexer.workspace = true
 iris-parser.workspace = true
 iris-syntax.workspace = true

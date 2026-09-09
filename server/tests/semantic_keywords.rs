@@ -13,9 +13,22 @@ fn retains_keywords_when_cursor_is_in_ordinary_context() {
         "textDocument":{"uri":"untitled:keywords"},"position":{"line":0,"character":0}}}),
     );
     let when = given.response();
-    let items = when["result"].as_array().unwrap();
-    assert_eq!(items.len(), 50);
-    assert!(items.iter().all(|item| item["kind"] == 14));
+    let items = when["result"]["items"].as_array().unwrap();
+    let keywords: Vec<_> = items
+        .iter()
+        .filter(|item| item["kind"] == 14)
+        .map(|item| item["label"].as_str().unwrap())
+        .collect();
+    let expected: Vec<String> =
+        serde_json::from_str(include_str!("../../language/keywords.json")).unwrap();
+    assert_eq!(keywords.len(), 50);
+    assert_eq!(keywords, expected);
+    assert!(
+        items
+            .iter()
+            .any(|item| item["label"] == "String" && item["kind"] == 7)
+    );
+    assert_eq!(when["result"]["isIncomplete"], false);
     given.shutdown();
 }
 

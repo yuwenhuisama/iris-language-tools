@@ -8,6 +8,7 @@ rust-version = "1.93"
 
 [workspace.dependencies]
 iris-analysis = { path = "analysis" }
+iris-builtins = { path = "../Iris-Language/crates/iris-builtins" }
 iris-formatter = { path = "formatter" }
 iris-lexer = { path = "../Iris-Language/crates/iris-lexer" }
 iris-parser = { path = "../Iris-Language/crates/iris-parser" }
