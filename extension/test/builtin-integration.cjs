@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 const { randomUUID } = require('node:crypto');
 const vscode = require('vscode');
-const { eventually, provider, position, range, replace } = require('./semantic-support.cjs');
+const { eventually, provider, position, range, replace, hints, hint } = require('./semantic-support.cjs');
 const { assertHover } = require('./hover-integration.cjs');
 const { assertSignature } = require('./signature-integration.cjs');
 
@@ -143,6 +143,20 @@ exports.verifyBuiltins = async function () {
           'Reading Object.hash must not infer the Integer returned by calling it');
       });
       console.log(`PASS: ${suffix} class-value copies retain metadata; Object method reads do not acquire return-type signatures`);
+
+      const indexed = 'let a = "ffff".split(""); let b = a[0]; b';
+      await replace(editor, indexed);
+      await eventually(`${suffix} split element type reaches indexed binding Hover and inlay hints`, async () => {
+        await assertHover(document, range(indexed, 'a', indexed.indexOf('a =')), [/Array<String>/]);
+        await assertHover(document, range(indexed, 'b', indexed.lastIndexOf('b')), [/String\?/]);
+        const actual = await hints(document);
+        for (const expected of [
+          hint(indexed, indexed.indexOf('a =') + 1, ': Array<String>'),
+          hint(indexed, indexed.indexOf('b =') + 1, ': String?'),
+        ]) assert.ok(actual.some(value => JSON.stringify(value) === JSON.stringify(expected)),
+          `Missing indexed type hint ${JSON.stringify(expected)}; got ${JSON.stringify(actual)}`);
+      });
+      console.log(`PASS: ${suffix} split returns Array<String>; indexed binding has String? Hover and inlay hints`);
     } finally {
       await vscode.window.showTextDocument(document);
       await vscode.commands.executeCommand('workbench.action.revertAndCloseActiveEditor');
