@@ -1,5 +1,29 @@
 # Local MVP Verification
 
+## Indexed Builtin Results
+
+2026-09-09 regression repair verified. The exact source
+`let a = "ffff".split(""); let b = a[0]; b` initially returned only `Array`
+for a and no type for b. Parent native VS Code acceptance reproduced the failure
+against the pre-fix server. The new acceptance checks require `Array<String>`
+and `String?` in both Hover and inlay hints on `.iris` and `.ir` buffers.
+
+The rebuilt server passed those native VS Code assertions in ordinary and empty
+workspaces. All analysis/LSP tests passed, including seven array-element analysis
+tests and three live-stdio tests; parser/catalog tests, scoped strict Clippy,
+server build and scoped formatting passed. The independent review found a
+cross-file constant escape missed by the local use scan; a failing two-file
+regression was added, constant exposure was conservatively refused, and the
+focused re-review returned APPROVE. Nullable indexed values do not acquire
+non-null String member completions. Physical typing/pixel evidence remains
+unavailable under the same unfocused-host limitation recorded below.
+
+Baseline `cargo test -p iris-analysis -p iris-lsp --locked --offline` passed.
+The full workspace baseline cannot compile the formatter test constructor in
+`formatter/src/normalize_tests.rs:42`: concurrent Closure AST work added
+`full_parameters` and `is_async`. This is separate from indexed type inference;
+the existing parallel implementation is preserved.
+
 ## Builtin Assistance
 
 Local implementation verified on 2026-09-08. The final focused gate review
