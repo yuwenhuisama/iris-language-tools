@@ -2,7 +2,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 
-const caller = 'import Core as Alias\nmodule Main { let item = Alias::Thing.new(); let result = item.read(); item.re }';
+const caller = 'import Core as Alias\nmodule Main { fun use() { let item = Alias::Thing.new(); let result = item.read(); item.re } }';
 const original = 'module Core {} class Core::Thing {\n/// Original docs\npublic fun read(value = 1) -> Integer { 1 } }';
 const manifest = sources => `manifest_version = 1\npackage_id = "org.example.semantic"\napi_major = 1\nversion = "1.0.0"\niris_major = 1\nsources = ${JSON.stringify(sources)}\nentry_modules = []\n[permissions]\nrequired = []\noptional = []\n`;
 

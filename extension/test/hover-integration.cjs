@@ -27,7 +27,7 @@ async function assertHover(document, occurrence, fragments) {
 exports.assertHover = assertHover;
 
 exports.verifyHover = async function () {
-  const source = "module Main { let text = '\u{1f600}'; let value = 1; value }";
+  const source = "module Main { fun read() { let text = '\u{1f600}'; let value = 1; value } }";
   const document = await vscode.workspace.openTextDocument({ language: 'iris', content: source });
   const editor = await vscode.window.showTextDocument(document);
   try {
@@ -46,7 +46,7 @@ exports.verifyHover = async function () {
     assert.equal(document.isDirty, true);
     console.log('PASS: Hover updates Integer to String from the current untitled buffer');
 
-    const methods = 'class Box { public fun read(value: Integer) -> String { \'result\' } }\nmodule Main { let item = Box.new(); item.read(1); item.unknown() }';
+    const methods = 'class Box { public fun read(value: Integer) -> String { \'result\' } }\nmodule Main { fun run() { let item = Box.new(); item.read(1); item.unknown() } }';
     await replace(editor, methods);
     await eventually('source method Hover signature at the call site', async () => {
       await assertHover(document, range(methods, 'read', methods.lastIndexOf('read')), [
@@ -61,7 +61,7 @@ exports.verifyHover = async function () {
       '/// Read safely.\n///\n/// ![image](https://example.test/a) <b> [run](command:run)\n/// @param stays plain',
       '/**\n * Read safely.\n *\n * ![image](https://example.test/a) <b> [run](command:run)\n * @param stays plain\n */',
     ]) {
-      const rich = `module Core {} class Core::Box {\n${comment}\npublic fun read(value: Integer) -> String { 'result' } }\nmodule Main { let box = Core::Box.new(); box.read(1) }`;
+      const rich = `module Core {} class Core::Box {\n${comment}\npublic fun read(value: Integer) -> String { 'result' } }\nmodule Main { fun run() { let box = Core::Box.new(); box.read(1) } }`;
       await replace(editor, rich);
       const occurrence = range(rich, 'read', rich.lastIndexOf('read'));
       await eventually('native rich method card with both documentation forms', async () => {
