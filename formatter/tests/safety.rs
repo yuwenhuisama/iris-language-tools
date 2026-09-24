@@ -142,7 +142,7 @@ fn rejects_malformed_syntax_when_tokens_are_lexically_clean() {
 fn preserves_newline_meaning_when_calls_symbols_and_arrays_are_adjacent() {
     for source in [
         "fun f(){return\n1}",
-        "let a = [1]\n[2]",
+        "let a = %[1]\n%[2]",
         "f(x: :a)",
         "obj.+(1)",
         "property fun ready?=(v: Bool) {}",
@@ -156,4 +156,34 @@ fn preserves_newline_meaning_when_calls_symbols_and_arrays_are_adjacent() {
             assert_eq!(format_document(&output), FormatOutcome::Unchanged);
         }
     }
+}
+
+#[test]
+fn declines_optional_navigation_and_nonnull_without_an_edit() {
+    for source in [
+        "let value=receiver?.member",
+        "let value=receiver?.member(1)?.other",
+        "let value=receiver!",
+        "let value=receiver!.member",
+        "let value=\"text\"!",
+    ] {
+        let parsed = iris_parser::parse(source);
+        assert!(
+            parsed.is_clean() && parsed.program_accepted,
+            "{source}: {parsed:?}"
+        );
+        assert_eq!(
+            format_document(source),
+            FormatOutcome::Skipped(SkipReason::UnsupportedSyntax),
+            "{source}"
+        );
+    }
+}
+
+#[test]
+fn formats_prefix_not_without_treating_it_as_postfix_nonnull() {
+    assert_eq!(
+        format_document("let ready=!blocked"),
+        FormatOutcome::Changed("let ready = !blocked\n".into())
+    );
 }

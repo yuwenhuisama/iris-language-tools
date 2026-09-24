@@ -23,6 +23,7 @@ pub enum SkipReason {
     CandidateParseDiagnostics,
     SemanticMismatch,
     TokenMismatch,
+    UnsupportedSyntax,
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -51,6 +52,26 @@ fn format_checked(source: &str) -> Result<String, SkipReason> {
     if !original.is_clean() || !original.program_accepted {
         return Err(SkipReason::ParseDiagnostics);
     }
+    if pieces
+        .iter()
+        .any(|piece| piece.kind == tokens::Kind::Code && matches!(piece.text, "!" | "?."))
+    {
+        let recorded = iris_parser::parse_with_source(source);
+        if !recorded.parse.is_clean()
+            || !recorded.parse.program_accepted
+            || recorded.source.nodes.iter().any(|node| {
+                matches!(
+                    node.kind,
+                    iris_parser::source::SourceKind::Expression(
+                        iris_parser::source::ExpressionFact::SafeNavigation { .. }
+                            | iris_parser::source::ExpressionFact::NonNull { .. }
+                    )
+                )
+            })
+        {
+            return Err(SkipReason::UnsupportedSyntax);
+        }
+    }
     let output = layout::render(&tree)?;
     let candidate = iris_parser::parse(&output);
     if !candidate.is_clean() || !candidate.program_accepted {
@@ -61,4 +82,21 @@ fn format_checked(source: &str) -> Result<String, SkipReason> {
     }
     tokens::verify(&pieces, &tokens::scan(&output)?)?;
     Ok(output)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{FormatOutcome, format_document};
+
+    #[test]
+    fn formats_selector_suffixes_when_bang_is_not_postfix_nonnull() {
+        let source = "obj.save ! ();obj..save ! ();let name=:save !";
+
+        let result = format_document(source);
+
+        assert_eq!(
+            result,
+            FormatOutcome::Changed("obj.save!()\nobj..save!()\nlet name = :save!\n".into())
+        );
+    }
 }
