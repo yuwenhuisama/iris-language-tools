@@ -33,21 +33,21 @@ fn completes_metadata_when_receiver_values_are_typed_or_copied() {
             2,
         ),
         (
-            "class Box {} module Main { let value = Box; let copy = value; copy.",
+            "class Box {} module Main { fun run() { let value = Box; let copy = value; copy.",
             "define_method",
             2,
         ),
         (
-            "module Main { let value = Float64; let copy = value; copy.",
+            "module Main { fun run() { let value = Float64; let copy = value; copy.",
             "from_bits",
             2,
         ),
         (
-            "contract C {} module Main { let value = C; value.",
+            "contract C {} module Main { fun run() { let value = C; value.",
             "parents",
             2,
         ),
-        ("module M {} module Main { M.", "modules", 10),
+        ("module M {} module Main { fun run() { M.", "modules", 10),
     ] {
         let given = text;
 
@@ -72,13 +72,16 @@ fn returns_signatures_when_receiver_is_a_class_or_contract_value() {
             2,
         ),
         (
-            "class Box {} module Main { let value = Box; value.define_method(",
+            "class Box {} module Main { fun run() { let value = Box; value.define_method(",
             2,
         ),
-        ("module Main { let value = Float64; value.from_bits(", 1),
-        ("contract C {} module Main { C.parents(", 0),
         (
-            "contract C {} module Main { let value = C; value.parents(",
+            "module Main { fun run() { let value = Float64; value.from_bits(",
+            1,
+        ),
+        ("contract C {} module Main { fun run() { C.parents(", 0),
+        (
+            "contract C {} module Main { fun run() { let value = C; value.parents(",
             0,
         ),
     ] {
@@ -99,9 +102,9 @@ fn returns_signatures_when_receiver_is_a_class_or_contract_value() {
 #[test]
 fn refuses_signatures_when_method_reads_are_not_calls() {
     for given in [
-        "module Main { Object.new().hash.div(",
-        "module Main { Object.new().to_string.replace(",
-        "module Main { let value = Object.new(); let method = value.hash; method.div(",
+        "module Main { fun run() { Object.new().hash.div(",
+        "module Main { fun run() { Object.new().to_string.replace(",
+        "module Main { fun run() { let value = Object.new(); let method = value.hash; method.div(",
     ] {
         let when = query("textDocument/signatureHelp", given);
 
@@ -112,12 +115,12 @@ fn refuses_signatures_when_method_reads_are_not_calls() {
 #[test]
 fn returns_signatures_when_methods_are_called_or_properties_are_read() {
     for given in [
-        "module Main { Object.new().hash().div(",
-        "module Main { Object.new().to_string().replace(",
-        "module Main { let value = Float64; value.nan.to_bits(",
+        "module Main { fun run() { Object.new().hash().div(",
+        "module Main { fun run() { Object.new().to_string().replace(",
+        "module Main { fun run() { let value = Float64; value.nan.to_bits(",
         "module Main { fun use(value: Class) { value.modules.push(",
-        "contract C {} module Main { C.parents.push(",
-        "module M {} module Main { M.modules.push(",
+        "contract C {} module Main { fun run() { C.parents.push(",
+        "module M {} module Main { fun run() { M.modules.push(",
     ] {
         let when = query("textDocument/signatureHelp", given);
 
@@ -133,15 +136,15 @@ fn returns_signatures_when_methods_are_called_or_properties_are_read() {
 #[test]
 fn refuses_signatures_when_receiver_evidence_does_not_establish_the_route() {
     for given in [
-        "module Main { let value = JSON; value.encode(",
-        "module Main { let value = Encoding::UTF_8; value.decode(",
-        "module Main { mut value = Float64; value.from_bits(",
+        "module Main { fun run() { let value = JSON; value.encode(",
+        "module Main { fun run() { let value = Encoding::UTF_8; value.decode(",
+        "module Main { fun run() { mut value = Float64; value.from_bits(",
         "contract C {} module Main { fun use(value: C) { value.parents(",
-        "class Box {} class Box {} module Main { let value = Box; value.define_method(",
-        "class Box {} open class Box {} module Main { let value = Box; value.define_method(",
-        "class Box { private class fun define_method(own) {} } module Main { let value = Box; value.define_method(",
-        "module Main { let Float64 = 1; let value = Float64; value.from_bits(",
-        "module M {} module Main { M.modules(",
+        "class Box {} class Box {} module Main { fun run() { let value = Box; value.define_method(",
+        "class Box {} open class Box {} module Main { fun run() { let value = Box; value.define_method(",
+        "class Box { private class fun define_method(own) {} } module Main { fun run() { let value = Box; value.define_method(",
+        "module Main { fun run() { let Float64 = 1; let value = Float64; value.from_bits(",
+        "module M {} module Main { fun run() { M.modules(",
     ] {
         let when = query("textDocument/signatureHelp", given);
 

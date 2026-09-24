@@ -62,7 +62,7 @@ impl Workspace {
 #[test]
 fn refuses_builtin_completion_when_manifest_source_is_missing_then_recovers_with_overlay() {
     for (receiver, expected) in [("'abc'", "replace"), ("JSON", "encode")] {
-        let text = format!("module Main {{ {receiver}.");
+        let text = format!("module Main {{ fun run() {{ {receiver}.");
         let mut given = Workspace::new(&text);
 
         let when = given.query("textDocument/completion", text.len());
@@ -89,7 +89,7 @@ fn refuses_builtin_hover_when_manifest_source_is_missing_then_recovers_with_over
         ("'abc'.replace('a', 'b')", "replace"),
         ("JSON.encode(1)", "encode"),
     ] {
-        let text = format!("module Main {{ {call} }}");
+        let text = format!("module Main {{ fun run() {{ {call} }} }}");
         let mut given = Workspace::new(&text);
         let position = text.find(selector).unwrap();
 
@@ -115,9 +115,9 @@ fn refuses_builtin_signature_when_manifest_source_is_missing_then_recovers_with_
         ("'abc'.replace('a', 'b')", "replace"),
         ("JSON.encode(1)", "encode"),
     ] {
-        let text = format!("module Main {{ {call} }}");
+        let text = format!("module Main {{ fun run() {{ {call} }} }}");
         let mut given = Workspace::new(&text);
-        let position = text.find('(').unwrap() + 1;
+        let position = text.find(selector).unwrap() + selector.len() + 1;
 
         let when = given.query("textDocument/signatureHelp", position);
 
@@ -137,7 +137,7 @@ fn refuses_builtin_signature_when_manifest_source_is_missing_then_recovers_with_
 
 #[test]
 fn preserves_source_assistance_when_manifest_source_is_missing() {
-    let text = "class Local { public fun source_only(value: Integer) -> Bool {} } module Main { let item = Local.new(); item.source_only(1) }";
+    let text = "class Local { public fun source_only(value: Integer) -> Bool {} } module Main { fun run() { let item = Local.new(); item.source_only(1) } }";
     let mut given = Workspace::new(text);
     let selector = text.rfind("source_only").unwrap();
 

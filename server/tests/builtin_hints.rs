@@ -38,7 +38,7 @@ fn labels(result: &Value) -> Vec<&str> {
 
 #[test]
 fn completes_string_methods_when_receiver_is_a_literal() {
-    let given = "module Main { 'abc'.<cursor> }";
+    let given = "module Main { fun run() { 'abc'.<cursor> } }";
 
     let when = query("textDocument/completion", given);
 
@@ -50,7 +50,7 @@ fn completes_string_methods_when_receiver_is_a_literal() {
 
 #[test]
 fn completes_string_methods_when_receiver_is_an_inferred_binding() {
-    let given = "module Main { let text = 'abc'; text.<cursor> }";
+    let given = "module Main { fun run() { let text = 'abc'; text.<cursor> } }";
 
     let when = query("textDocument/completion", given);
 
@@ -62,7 +62,7 @@ fn completes_string_methods_when_receiver_is_an_inferred_binding() {
 
 #[test]
 fn returns_selector_utf16_range_when_hovering_string_replace() {
-    let given = "module Main {\r\n '\u{1f600}'.re<cursor>place('a', 'b')\r\n}";
+    let given = "module Main { fun run() {\r\n '\u{1f600}'.re<cursor>place('a', 'b')\r\n} }";
 
     let when = query("textDocument/hover", given);
 
@@ -81,7 +81,7 @@ fn returns_selector_utf16_range_when_hovering_string_replace() {
 
 #[test]
 fn selects_second_parameter_when_string_replace_has_a_comma() {
-    let given = "module Main { 'abc'.replace('a', <cursor>) }";
+    let given = "module Main { fun run() { 'abc'.replace('a', <cursor>) } }";
 
     let when = query("textDocument/signatureHelp", given);
 
@@ -104,7 +104,7 @@ fn selects_second_parameter_when_string_replace_has_a_comma() {
 
 #[test]
 fn completes_class_methods_when_receiver_is_float64_class() {
-    let given = "module Main { Float64.<cursor> }";
+    let given = "module Main { fun run() { Float64.<cursor> } }";
 
     let when = query("textDocument/completion", given);
 
@@ -115,7 +115,7 @@ fn completes_class_methods_when_receiver_is_float64_class() {
 
 #[test]
 fn completes_instance_methods_when_receiver_is_float64_literal() {
-    let given = "module Main { let number = 1.0; number.<cursor> }";
+    let given = "module Main { fun run() { let number = 1.0; number.<cursor> } }";
 
     let when = query("textDocument/completion", given);
 
@@ -126,7 +126,7 @@ fn completes_instance_methods_when_receiver_is_float64_literal() {
 
 #[test]
 fn returns_class_signature_when_calling_float64_from_bits() {
-    let given = "module Main { Float64.from_bits(<cursor>0) }";
+    let given = "module Main { fun run() { Float64.from_bits(<cursor>0) } }";
 
     let when = query("textDocument/signatureHelp", given);
 
@@ -138,7 +138,7 @@ fn returns_class_signature_when_calling_float64_from_bits() {
 
 #[test]
 fn returns_null_when_class_method_is_called_on_float64_instance() {
-    let given = "module Main { let number = 1.0; number.from_bits(<cursor>0) }";
+    let given = "module Main { fun run() { let number = 1.0; number.from_bits(<cursor>0) } }";
 
     let when = query("textDocument/signatureHelp", given);
 
@@ -147,7 +147,7 @@ fn returns_null_when_class_method_is_called_on_float64_instance() {
 
 #[test]
 fn completes_array_methods_when_receiver_is_a_literal() {
-    let given = "module Main { [1, 2].<cursor> }";
+    let given = "module Main { fun run() { %[1, 2].<cursor> } }";
 
     let when = query("textDocument/completion", given);
 
@@ -182,8 +182,8 @@ fn suppresses_builtin_hints_when_receiver_is_dynamic() {
 fn returns_empty_navigation_when_builtin_has_no_source_declaration() {
     for method in ["textDocument/definition", "textDocument/references"] {
         for given in [
-            "module Main { 'abc'.re<cursor>place('a', 'b'); 'abc'.replace('a', 'c') }",
-            "module Main { Float64.fr<cursor>om_bits(0); Float64.from_bits(1) }",
+            "module Main { fun use() { 'abc'.re<cursor>place('a', 'b'); 'abc'.replace('a', 'c') } }",
+            "module Main { fun use() { Float64.fr<cursor>om_bits(0); Float64.from_bits(1) } }",
         ] {
             let when = query(method, given);
 
@@ -195,8 +195,8 @@ fn returns_empty_navigation_when_builtin_has_no_source_declaration() {
 #[test]
 fn returns_null_when_unknown_inner_call_has_a_known_outer_call() {
     for given in [
-        "module Main { 'abc'.replace('a', unknown(<cursor>)) }",
-        "module Main { public fun outer(first, second) {} outer(1, 'abc'.unknown(<cursor>)) }",
+        "module Main { fun use() { 'abc'.replace('a', unknown(<cursor>)) } }",
+        "module Main { public fun outer(first, second) {} fun use() { outer(1, 'abc'.unknown(<cursor>)) } }",
     ] {
         let when = query("textDocument/signatureHelp", given);
 
