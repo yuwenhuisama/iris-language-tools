@@ -54,12 +54,12 @@ fn retains_required_semicolons_when_closures_and_accessors_are_inline() {
 #[test]
 fn formats_multiline_lists_when_source_is_already_broken() {
     golden(
-        "let a=[1,\n2];let h=%{\n:ok:1,:bad:2\n};let t=(1,);foo(\n1,2\n)",
-        "let a = [\n  1,\n  2,\n]\nlet h = %{\n  :ok: 1,\n  :bad: 2,\n}\nlet t = (1,)\nfoo(\n  1,\n  2,\n)\n",
+        "let a=%[1,\n2];let h=%{\n:ok:1,:bad:2\n};let t=(1,);foo(\n1,2\n)",
+        "let a = %[\n  1,\n  2,\n]\nlet h = %{\n  :ok: 1,\n  :bad: 2,\n}\nlet t = (1,)\nfoo(\n  1,\n  2,\n)\n",
     );
     golden(
-        "let a=[1,2,];foo(1,);let t=(1,2,)",
-        "let a = [1, 2]\nfoo(1)\nlet t = (1, 2)\n",
+        "let a=%[1,2,];foo(1,);let t=(1,2,)",
+        "let a = %[1, 2]\nfoo(1)\nlet t = (1, 2)\n",
     );
 }
 

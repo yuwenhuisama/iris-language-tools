@@ -27,10 +27,14 @@ fn keeps_unary_tight_when_comment_ends_top_level_statement() {
     ] {
         for operator in ["+", "-", "!", "~"] {
             for newline in ["\n", "\r\n", "\r"] {
+                let separator = if operator == "!" { ";" } else { "" };
                 golden(
-                    &format!("let x={operand} /*tail{newline}keep*/ {operator} next()\nlet y=2"),
                     &format!(
-                        "let x = {operand}  /*tail{newline}keep*/ {operator}next()\nlet y = 2\n"
+                        "let x={operand} /*tail{newline}keep*/{separator} {operator} next()\nlet y=2"
+                    ),
+                    &format!(
+                        "let x = {operand}  /*tail{newline}keep*/{}{operator}next()\nlet y = 2\n",
+                        if operator == "!" { "\n" } else { " " }
                     ),
                 );
             }
@@ -61,7 +65,7 @@ fn retains_binary_spacing_when_comment_newline_is_delimited() {
     for operand in ["Box<Integer>", "value", "previous()"] {
         for operator in ["+", "-"] {
             for (open, close, comma) in [
-                ("[", "]", ","),
+                ("%[", "]", ","),
                 ("call(", ")", ","),
                 ("(", ")", ""),
                 ("values[", "]", ""),
@@ -126,9 +130,9 @@ fn retains_binary_spacing_when_delimited_comment_has_exterior_newlines() {
         for operator in ["+", "-"] {
             for (before, after) in [("", "\n"), ("\n", ""), ("\n", "\n")] {
                 golden(
-                    &format!("let x=[{operand}{before} /*tail\nkeep*/{after}{operator}next()]"),
+                    &format!("let x=%[{operand}{before} /*tail\nkeep*/{after}{operator}next()]"),
                     &format!(
-                        "let x = [\n  {operand}{}/*tail\nkeep*/{}{operator} next(),\n]\n",
+                        "let x = %[\n  {operand}{}/*tail\nkeep*/{}{operator} next(),\n]\n",
                         if before.is_empty() { "  " } else { "\n  " },
                         if after.is_empty() { " " } else { "\n  " },
                     ),
@@ -166,8 +170,8 @@ fn retains_operand_roles_when_comments_surround_delimited_operators() {
             ("//tail\n", "// tail\n  "),
         ] {
             golden(
-                &format!("let x=[value {operator} {comment} - next()]"),
-                &format!("let x = [\n  value {operator}  {expected}-next(),\n]\n"),
+                &format!("let x=%[value {operator} {comment} - next()]"),
+                &format!("let x = %[\n  value {operator}  {expected}-next(),\n]\n"),
             );
         }
     }

@@ -22,7 +22,7 @@ fn formats_varied_valid_statements_when_layout_and_adjacency_change() {
         "return",
         "return - 1",
         "raise problem from cause",
-        "let x=[1,2,]",
+        "let x=%[1,2,]",
         "let f={||;2}",
         "let f={|x|;x+1}",
         "foo(x: :ok)",
@@ -53,9 +53,18 @@ fn formats_varied_valid_statements_when_layout_and_adjacency_change() {
 
 #[test]
 fn leaves_semicolon_sensitive_index_boundaries_unchanged_when_joining_would_change_meaning() {
-    let source = "let x = a;[0]";
+    let source = "let x = a;items[0]";
+    let parsed = iris_parser::parse(source);
+    assert!(
+        parsed.program_accepted && parsed.is_clean(),
+        "{:?}",
+        parsed.diagnostics
+    );
     let outcome = format_document(source);
-    assert_eq!(outcome, FormatOutcome::Changed("let x = a\n[0]\n".into()));
+    assert_eq!(
+        outcome,
+        FormatOutcome::Changed("let x = a\nitems[0]\n".into())
+    );
 }
 
 #[test]
