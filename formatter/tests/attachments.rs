@@ -24,14 +24,14 @@ fn keeps_comments_on_their_line_when_they_follow_a_closing_body() {
 #[test]
 fn preserves_comments_inside_lists_when_they_precede_the_first_item() {
     golden(
-        "let x=[\n//one\n1,\n//two\n2\n]",
-        "let x = [\n  // one\n  1,\n  // two\n  2,\n]\n",
+        "let x=%[\n//one\n1,\n//two\n2\n]",
+        "let x = %[\n  // one\n  1,\n  // two\n  2,\n]\n",
     );
 }
 
 #[test]
 fn preserves_comments_after_the_final_comma_when_a_list_closes() {
-    golden("let x=[1,\n// end\n]", "let x = [\n  1,\n  // end\n]\n");
+    golden("let x=%[1,\n// end\n]", "let x = %[\n  1,\n  // end\n]\n");
 }
 
 #[test]

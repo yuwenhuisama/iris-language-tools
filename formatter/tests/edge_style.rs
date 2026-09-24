@@ -30,16 +30,16 @@ fn spaces_symbolic_calls_when_selectors_are_operators() {
 #[test]
 fn keeps_comments_with_list_items_when_trailing_commas_are_inserted() {
     golden(
-        "let a=[\n1,//one\n2 //two\n]",
-        "let a = [\n  1,  // one\n  2,  // two\n]\n",
+        "let a=%[\n1,//one\n2 //two\n]",
+        "let a = %[\n  1,  // one\n  2,  // two\n]\n",
     );
 }
 
 #[test]
 fn retains_nested_closures_when_an_earlier_property_exists() {
     golden(
-        "class A{property value:Integer\nlet f={|x|;x+1}\nfun run(){let g={||;2};g()}}",
-        "class A {\n  property value: Integer\n  let f = { |x|; x + 1 }\n\n  fun run() {\n    let g = { ||; 2 }\n    g()\n  }\n}\n",
+        "class A{property value:Integer\nlet @f={|x|;x+1}\nfun run(){let g={||;2};g()}}",
+        "class A {\n  property value: Integer\n  let @f = { |x|; x + 1 }\n\n  fun run() {\n    let g = { ||; 2 }\n    g()\n  }\n}\n",
     );
 }
 

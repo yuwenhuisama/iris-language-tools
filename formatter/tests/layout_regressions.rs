@@ -24,8 +24,8 @@ fn expands_named_body_when_return_type_starts_on_next_line() {
 #[test]
 fn expands_named_body_when_class_clauses_span_lines() {
     golden(
-        "class C\nextends Base\n{1}",
-        "class C extends Base {\n  1\n}\n",
+        "class C\nextends Base\n{fun f(){1}}",
+        "class C extends Base {\n  fun f() {\n    1\n  }\n}\n",
     );
 }
 
@@ -38,8 +38,8 @@ fn retains_header_context_when_neighboring_declarations_span_lines() {
         ),
         ("module M\nmixin Base\n{}", "module M mixin Base {\n}\n"),
         (
-            "class C\nextends\nBase\nfor Other\n{}",
-            "class C extends Base for Other {\n}\n",
+            "class C\nextends\nBase\nmixin Other\n{}",
+            "class C extends Base mixin Other {\n}\n",
         ),
         (
             "fun f() ->\nBox<Integer>\n{1}",
@@ -69,10 +69,13 @@ fn retains_header_context_when_generic_types_span_lines() {
 
 #[test]
 fn indents_type_operand_when_keyword_operator_requires_continuation() {
-    for operator in ["is", "as", "as?"] {
+    for operator in ["is?", "as", "as?"] {
         golden(
             &format!("let x=value {operator}\nInteger"),
-            &format!("let x = value {operator}\n  Integer\n"),
+            &format!(
+                "let x = value {operator}\n{}Integer\n",
+                if operator == "is?" { "" } else { "  " }
+            ),
         );
     }
 }
@@ -163,20 +166,20 @@ fn preserves_comment_attachment_when_declaration_has_leading_docs() {
 #[test]
 fn retains_standalone_comment_when_it_precedes_an_element_comma() {
     golden(
-        "let x=[\n1\n//note\n,2]",
-        "let x = [\n  1,\n  // note\n  2,\n]\n",
+        "let x=%[\n1\n//note\n,2]",
+        "let x = %[\n  1,\n  // note\n  2,\n]\n",
     );
 }
 
 #[test]
 fn preserves_comment_lines_when_multiple_comments_follow_an_element() {
     golden(
-        "let x=[1 //tail\n//note\n,2]",
-        "let x = [\n  1,  // tail\n  // note\n  2,\n]\n",
+        "let x=%[1 //tail\n//note\n,2]",
+        "let x = %[\n  1,  // tail\n  // note\n  2,\n]\n",
     );
     golden(
-        "let x=[1\n/*note*/\n,2]",
-        "let x = [\n  1,\n  /*note*/\n  2,\n]\n",
+        "let x=%[1\n/*note*/\n,2]",
+        "let x = %[\n  1,\n  /*note*/\n  2,\n]\n",
     );
 }
 
@@ -221,24 +224,24 @@ fn retains_pending_operand_when_block_comments_follow_a_break() {
 #[test]
 fn places_comma_after_element_when_leading_and_standalone_comments_coexist() {
     golden(
-        "let x=[\n//leading\n1\n//note\n,2]",
-        "let x = [\n  // leading\n  1,\n  // note\n  2,\n]\n",
+        "let x=%[\n//leading\n1\n//note\n,2]",
+        "let x = %[\n  // leading\n  1,\n  // note\n  2,\n]\n",
     );
 }
 
 #[test]
 fn places_comma_before_tail_when_element_also_has_leading_comment() {
     golden(
-        "let x=[\n//leading\n1 //tail\n,2]",
-        "let x = [\n  // leading\n  1,  // tail\n  2,\n]\n",
+        "let x=%[\n//leading\n1 //tail\n,2]",
+        "let x = %[\n  // leading\n  1,  // tail\n  2,\n]\n",
     );
 }
 
 #[test]
 fn classifies_comments_when_neighboring_elements_have_mixed_attachments() {
     golden(
-        "let x=[\n//leading\n/*before*/\n1 //tail\n//note\n,2 /*after*/\n//last\n]",
-        "let x = [\n  // leading\n  /*before*/\n  1,  // tail\n  // note\n  2,  /*after*/\n  // last\n]\n",
+        "let x=%[\n//leading\n/*before*/\n1 //tail\n//note\n,2 /*after*/\n//last\n]",
+        "let x = %[\n  // leading\n  /*before*/\n  1,  // tail\n  // note\n  2,  /*after*/\n  // last\n]\n",
     );
 }
 
@@ -246,12 +249,12 @@ fn classifies_comments_when_neighboring_elements_have_mixed_attachments() {
 fn retains_internal_block_comments_when_placing_element_comma() {
     for (source, expected) in [
         (
-            "let x=[\n//leading\n1/*inner*/+2 /*tail*/\n//note\n,3]",
-            "let x = [\n  // leading\n  1  /*inner*/ + 2,  /*tail*/\n  // note\n  3,\n]\n",
+            "let x=%[\n//leading\n1/*inner*/+2 /*tail*/\n//note\n,3]",
+            "let x = %[\n  // leading\n  1  /*inner*/ + 2,  /*tail*/\n  // note\n  3,\n]\n",
         ),
         (
-            "let x=[/*leading*/1/*inner*/+2/*tail*/,3]",
-            "let x = [\n  /*leading*/1  /*inner*/ + 2,  /*tail*/\n  3,\n]\n",
+            "let x=%[/*leading*/1/*inner*/+2/*tail*/,3]",
+            "let x = %[\n  /*leading*/1  /*inner*/ + 2,  /*tail*/\n  3,\n]\n",
         ),
     ] {
         golden(source, expected);
