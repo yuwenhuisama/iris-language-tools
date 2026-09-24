@@ -1,4 +1,4 @@
-use iris_syntax::{Expression, Program, Statement};
+use iris_syntax::{Expression, PostfixPart, Program, Statement};
 
 #[test]
 fn erases_only_raise_offsets_when_source_locations_change() {
@@ -41,6 +41,8 @@ fn preserves_every_semantic_difference_when_raise_offsets_are_normalized() {
 fn visits_typeof_and_decorators_when_they_contain_nested_raise_statements() {
     let raise = |offset| Expression::Closure {
         parameters: Vec::new(),
+        full_parameters: Vec::new(),
+        is_async: false,
         return_type: None,
         has_header: false,
         body: vec![Statement::Raise(Some(iris_syntax::Raise {
@@ -57,6 +59,8 @@ fn visits_typeof_and_decorators_when_they_contain_nested_raise_statements() {
                 name: "tag".into(),
                 arguments: vec![raise(offset)],
             }],
+            visibility: iris_syntax::Visibility::Private,
+            accessors: None,
             shared: false,
             class_level: false,
             name: "value".into(),
@@ -64,6 +68,111 @@ fn visits_typeof_and_decorators_when_they_contain_nested_raise_statements() {
             initializer: raise(offset),
         }],
     };
+    assert_eq!(
+        super::normalize::program(program(1)),
+        super::normalize::program(program(99))
+    );
+}
+
+#[test]
+fn normalizes_raise_offsets_inside_new_expression_wrappers() {
+    let raise = |offset| Expression::Closure {
+        parameters: Vec::new(),
+        full_parameters: Vec::new(),
+        is_async: false,
+        return_type: None,
+        has_header: false,
+        body: vec![Statement::Raise(Some(iris_syntax::Raise {
+            value: Expression::Name("problem".into()),
+            cause: None,
+            offset,
+        }))],
+    };
+    let program = |offset| Program {
+        declarations: Vec::new(),
+        entries: Vec::new(),
+        statements: vec![Statement::Expression(Expression::SafeNavigation {
+            receiver: Box::new(Expression::NonNull(Box::new(raise(offset)))),
+            parts: vec![
+                PostfixPart::Member {
+                    selector: "method".into(),
+                    safe: true,
+                },
+                PostfixPart::Call {
+                    type_arguments: Vec::new(),
+                    arguments: vec![
+                        Expression::PositionalSpread {
+                            value: Box::new(raise(offset)),
+                        },
+                        Expression::KeywordSpread {
+                            value: Box::new(raise(offset)),
+                        },
+                        Expression::BlockArgument {
+                            value: Box::new(raise(offset)),
+                        },
+                    ],
+                },
+                PostfixPart::Index(Box::new(raise(offset))),
+                PostfixPart::TrailingBlock(Box::new(raise(offset))),
+            ],
+        })],
+    };
+
+    assert_eq!(
+        super::normalize::program(program(1)),
+        super::normalize::program(program(99))
+    );
+}
+
+#[test]
+fn normalizes_raise_offsets_inside_impl_methods_and_instance_fields() {
+    let raise = |offset| Expression::Closure {
+        parameters: Vec::new(),
+        full_parameters: Vec::new(),
+        is_async: false,
+        return_type: None,
+        has_header: false,
+        body: vec![Statement::Raise(Some(iris_syntax::Raise {
+            value: Expression::Name("problem".into()),
+            cause: None,
+            offset,
+        }))],
+    };
+    let program = |offset| Program {
+        declarations: vec![iris_syntax::Declaration::Impl(
+            iris_syntax::ImplDeclaration {
+                target: iris_syntax::TypeExpression::Typeof(Box::new(raise(offset))),
+                contract: iris_syntax::TypeExpression::Typeof(Box::new(raise(offset))),
+                constraints: vec![iris_syntax::Constraint {
+                    parameter: "T".into(),
+                    bound: iris_syntax::TypeExpression::Typeof(Box::new(raise(offset))),
+                }],
+                methods: vec![iris_syntax::MethodDeclaration {
+                    decorators: Vec::new(),
+                    is_async: false,
+                    is_override: false,
+                    impl_contract: None,
+                    kind: iris_syntax::MethodKind::Instance,
+                    selector: "run".into(),
+                    type_parameters: Vec::new(),
+                    parameters: Vec::new(),
+                    return_type: Some(iris_syntax::TypeExpression::Typeof(Box::new(raise(offset)))),
+                    visibility: iris_syntax::Visibility::Private,
+                    body: Some(vec![Statement::InstanceField {
+                        mutable: false,
+                        name: "field".into(),
+                        annotation: Some(iris_syntax::TypeExpression::Typeof(Box::new(raise(
+                            offset,
+                        )))),
+                        value: raise(offset),
+                    }]),
+                }],
+            },
+        )],
+        entries: Vec::new(),
+        statements: Vec::new(),
+    };
+
     assert_eq!(
         super::normalize::program(program(1)),
         super::normalize::program(program(99))

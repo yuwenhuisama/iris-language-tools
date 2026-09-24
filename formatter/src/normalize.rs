@@ -49,6 +49,22 @@ fn declaration(value: &mut Declaration) {
             }
             statements(&mut value.body);
         }
+        Declaration::Impl(value) => {
+            crate::normalize_expression::annotation(&mut value.target);
+            crate::normalize_expression::annotation(&mut value.contract);
+            for constraint in &mut value.constraints {
+                crate::normalize_expression::annotation(&mut constraint.bound);
+            }
+            for method in &mut value.methods {
+                decorators(&mut method.decorators);
+                for parameter in &mut method.parameters {
+                    optional_type(&mut parameter.annotation);
+                    optional_expression(&mut parameter.default);
+                }
+                optional_type(&mut method.return_type);
+                optional_body(&mut method.body);
+            }
+        }
         Declaration::Import(_) => {}
         Declaration::Export(value) => match value.as_mut() {
             ExportDeclaration::Declaration(value) => declaration(value),
@@ -66,7 +82,10 @@ pub fn statements(values: &mut [Statement]) {
 
 fn statement(value: &mut Statement) {
     match value {
-        Statement::GlobalBinding {
+        Statement::InstanceField {
+            annotation, value, ..
+        }
+        | Statement::GlobalBinding {
             annotation, value, ..
         }
         | Statement::SharedBinding {

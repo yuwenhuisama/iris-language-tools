@@ -1,4 +1,4 @@
-use iris_syntax::{Decorator, Expression, TypeExpression};
+use iris_syntax::{Decorator, Expression, PostfixPart, TypeExpression};
 
 use crate::normalize::{handlers, optional_body, statements};
 
@@ -7,6 +7,7 @@ pub fn expression(value: &mut Expression) {
         Expression::ReifiedType(value) => annotation(value),
         Expression::ClosedGeneric { arguments, .. } => types(arguments),
         Expression::Await(value)
+        | Expression::NonNull(value)
         | Expression::Grouped(value)
         | Expression::Unary { operand: value, .. }
         | Expression::Member {
@@ -15,7 +16,10 @@ pub fn expression(value: &mut Expression) {
         | Expression::ContractView {
             receiver: value, ..
         }
-        | Expression::KeywordArgument { value, .. } => expression(value),
+        | Expression::KeywordArgument { value, .. }
+        | Expression::PositionalSpread { value }
+        | Expression::KeywordSpread { value }
+        | Expression::BlockArgument { value } => expression(value),
         Expression::Yield(value) => {
             if let Some(value) = value {
                 expression(value);
@@ -28,6 +32,7 @@ pub fn expression(value: &mut Expression) {
         | Expression::ClassVar(_)
         | Expression::GlobalVar(_) => {}
         Expression::Array(values) | Expression::Tuple(values) => expressions(values),
+        Expression::SafeNavigation { receiver, parts } => safe_navigation(receiver, parts),
         Expression::Hash(entries) => {
             for (key, value) in entries {
                 expression(key);
@@ -80,6 +85,23 @@ pub fn expression(value: &mut Expression) {
             statements(body);
             handlers(catches);
             optional_body(finally);
+        }
+    }
+}
+
+fn safe_navigation(receiver: &mut Expression, parts: &mut [PostfixPart]) {
+    expression(receiver);
+    for part in parts {
+        match part {
+            PostfixPart::Member { .. } => {}
+            PostfixPart::Call {
+                type_arguments,
+                arguments,
+            } => {
+                types(type_arguments);
+                expressions(arguments);
+            }
+            PostfixPart::Index(index) | PostfixPart::TrailingBlock(index) => expression(index),
         }
     }
 }
