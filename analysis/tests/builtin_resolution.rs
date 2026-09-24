@@ -53,17 +53,17 @@ fn signature_is_absent_when_source_candidates_block_builtin_fallback() {
 #[test]
 fn signature_candidates_when_argument_count_or_keyword_selects_shape() {
     for (call, count, parameter) in [
-        ("[1].reduce(0, ", 1, 1),
-        ("[1].count(", 2, 0),
+        ("%[1].reduce(0, ", 1, 1),
+        ("%[1].count(", 2, 0),
         ("(1 ..= 3).by(step: ", 1, 0),
         ("JSON.encode(1, canonical: ", 1, 1),
     ] {
-        let text = format!("module Main {{ {call}");
+        let text = format!("module Main {{ fun use() {{ {call}");
         let given = snapshot(&text);
         let when = given.signature_help(FileId(1), text.len()).unwrap();
         assert_eq!(when.signatures.len(), count, "{text}: {when:?}");
         let active = &when.signatures[when.active_signature];
-        if call == "[1].count(" {
+        if call == "%[1].count(" {
             assert!(active.parameters.is_empty());
             assert_eq!(active.active_parameter, None);
         } else {
@@ -82,7 +82,7 @@ fn positional_placeholder_is_not_a_keyword_when_catalog_names_display_slots() {
 
 #[test]
 fn prefix_replacement_when_selector_has_existing_suffix() {
-    let text = "module Main { 'abc'.replace('a', 'b') }";
+    let text = "module Main { fun use() { 'abc'.replace('a', 'b') } }";
     let given = snapshot(text);
     let start = text.find("replace").unwrap();
     let when = given.completions(FileId(1), start + 2);
@@ -109,7 +109,7 @@ fn source_class_metadata_when_selector_is_absent_and_owner_is_certain() {
         ),
         ("class Box {} class Box {}", false),
     ] {
-        let text = format!("{declaration} module Main {{ Box.define_method(");
+        let text = format!("{declaration} module Main {{ fun use() {{ Box.define_method(");
         let given = snapshot(&text);
         let when = given.signature_help(FileId(1), text.len());
         assert_eq!(when.is_some(), expected, "{text}");

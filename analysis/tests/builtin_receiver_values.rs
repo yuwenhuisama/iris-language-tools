@@ -24,19 +24,22 @@ fn completes_metadata_when_receiver_category_survives_an_immutable_copy() {
             "define_method",
         ),
         (
-            "class Box {} module Main { let value = Box; let copy = (value); copy.",
+            "class Box {} module Main { fun use() { let value = Box; let copy = (value); copy.",
             "define_method",
         ),
         (
-            "module Main { let value = Float64; let copy = (value); copy.",
+            "module Main { fun use() { let value = Float64; let copy = (value); copy.",
             "from_bits",
         ),
-        ("module Main { let value = Float64; value.", "define_method"),
         (
-            "contract C {} module Main { let value = C; value.",
+            "module Main { fun use() { let value = Float64; value.",
+            "define_method",
+        ),
+        (
+            "contract C {} module Main { fun use() { let value = C; value.",
             "parents",
         ),
-        ("module M {} module Main { M.", "modules"),
+        ("module M {} module Main { fun use() { M.", "modules"),
     ] {
         let given = snapshot(text);
 
@@ -57,13 +60,16 @@ fn returns_metadata_signatures_when_receiver_is_a_class_or_contract_value() {
             2,
         ),
         (
-            "class Box {} module Main { let value = Box; value.define_method(",
+            "class Box {} module Main { fun use() { let value = Box; value.define_method(",
             2,
         ),
-        ("module Main { let value = Float64; value.from_bits(", 1),
-        ("contract C {} module Main { C.parents(", 0),
         (
-            "contract C {} module Main { let value = C; let copy = value; copy.parents(",
+            "module Main { fun use() { let value = Float64; value.from_bits(",
+            1,
+        ),
+        ("contract C {} module Main { fun use() { C.parents(", 0),
+        (
+            "contract C {} module Main { fun use() { let value = C; let copy = value; copy.parents(",
             0,
         ),
     ] {
@@ -82,7 +88,7 @@ fn returns_metadata_signatures_when_receiver_is_a_class_or_contract_value() {
 
 #[test]
 fn completes_property_kind_when_module_metadata_is_read() {
-    let text = "module M {} module Main { M.mod";
+    let text = "module M {} module Main { fun use() { M.mod";
     let given = snapshot(text);
 
     let when = given.completions(FileId(1), text.len());
@@ -96,7 +102,7 @@ fn completes_property_kind_when_module_metadata_is_read() {
 
 #[test]
 fn refuses_module_metadata_when_source_route_is_copied_as_a_value() {
-    let text = "module M {} module Main { let value = M; value.mod";
+    let text = "module M {} module Main { fun use() { let value = M; value.mod";
     let given = snapshot(text);
 
     let when = given.completions(FileId(1), text.len());
@@ -164,14 +170,14 @@ fn refuses_result_chains_when_heap_object_method_is_read_without_calling() {
 #[test]
 fn preserves_result_chains_when_heap_methods_are_called_or_value_properties_are_read() {
     for text in [
-        "module Main { Object.new().hash().div(",
-        "module Main { Object.new().to_string().replace(",
-        "module Main { let value = Object; value.new().hash().div(",
-        "module Main { let value = Float64; value.nan.to_bits(",
-        "module Main { 'abc'.hash.div(",
+        "module Main { fun use() { Object.new().hash().div(",
+        "module Main { fun use() { Object.new().to_string().replace(",
+        "module Main { fun use() { let value = Object; value.new().hash().div(",
+        "module Main { fun use() { let value = Float64; value.nan.to_bits(",
+        "module Main { fun use() { 'abc'.hash.div(",
         "module Main { fun use(value: Class) { value.modules.push(",
-        "contract C {} module Main { let value = C; value.parents.push(",
-        "module M {} module Main { M.modules.push(",
+        "contract C {} module Main { fun use() { let value = C; value.parents.push(",
+        "module M {} module Main { fun use() { M.modules.push(",
     ] {
         let given = snapshot(text);
 

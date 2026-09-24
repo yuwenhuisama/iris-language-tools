@@ -12,7 +12,7 @@ fn snapshot(text: &str) -> AnalysisSnapshot {
 #[test]
 fn suppresses_catalog_completion_only_when_source_group_is_incomplete() {
     for (expression, label) in [("", "String"), ("'abc'.", "replace"), ("JSON.", "encode")] {
-        let text = format!("module Main {{ {expression}");
+        let text = format!("module Main {{ fun use() {{ {expression}");
         let given = snapshot(&text);
 
         let when = given.completions(FileId(1), text.len());
@@ -37,7 +37,7 @@ fn suppresses_catalog_hover_only_when_source_group_is_incomplete() {
         ("print(1)", "print"),
         ("String", "String"),
     ] {
-        let text = format!("module Main {{ {expression} }}");
+        let text = format!("module Main {{ fun use() {{ {expression} }} }}");
         let given = snapshot(&text);
         let offset = text.find(selector).unwrap();
 
@@ -51,9 +51,9 @@ fn suppresses_catalog_hover_only_when_source_group_is_incomplete() {
 #[test]
 fn suppresses_catalog_signature_only_when_source_group_is_incomplete() {
     for expression in ["'abc'.replace('a', 'b')", "JSON.encode(1)", "print(1)"] {
-        let text = format!("module Main {{ {expression} }}");
+        let text = format!("module Main {{ fun use() {{ {expression} }} }}");
         let given = snapshot(&text);
-        let offset = text.find('(').unwrap() + 1;
+        let offset = text.rfind(expression).unwrap() + expression.find('(').unwrap() + 1;
 
         let when = given.signature_help(FileId(1), offset);
 
