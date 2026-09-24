@@ -10,7 +10,7 @@ fn snapshot(text: &str) -> AnalysisSnapshot {
 
 #[test]
 fn empty_signature_when_editor_has_only_open_parenthesis() {
-    let text = "module Main { fun read() {} read(";
+    let text = "module Main { fun read() {} fun use() { read(";
     let given = snapshot(text);
     let when = given.signature_help(FileId(1), text.len()).unwrap();
     assert_eq!(when.signatures[0].active_parameter, None);
@@ -26,7 +26,7 @@ fn signature_is_absent_when_keyword_and_block_parameters_precede_positionals() {
 
 #[test]
 fn positional_mapping_when_parameters_follow_channel_order() {
-    let text = "module Main { fun read(value, *rest, key option, &block) {} read(1, 2";
+    let text = "module Main { fun read(value, *rest, key option, &block) {} fun use() { read(1, 2";
     let given = snapshot(text);
     let when = given.signature_help(FileId(1), text.len()).unwrap();
     assert_eq!(when.signatures[0].active_parameter, Some(1));
@@ -35,7 +35,7 @@ fn positional_mapping_when_parameters_follow_channel_order() {
 #[test]
 fn hole_mapping_when_cursor_is_in_trivia_before_boundary() {
     for suffix in ["read(1,   ) }", "read(1,   }", "read(1,   "] {
-        let text = format!("module Main {{ fun read(first, second) {{}} {suffix}");
+        let text = format!("module Main {{ fun read(first, second) {{}} fun use() {{ {suffix}");
         let given = snapshot(&text);
         let when = given
             .signature_help(FileId(1), text.rfind(',').unwrap() + 2)
@@ -82,7 +82,7 @@ fn signature_is_absent_when_cursor_is_not_a_utf8_boundary_or_outside_call() {
 
 #[test]
 fn inner_complete_call_when_cursor_precedes_inner_closer() {
-    let text = "module Main { fun outer(first,second) {} fun inner(value) {} outer(1, inner(2)) }";
+    let text = "module Main { fun outer(first,second) {} fun inner(value) {} fun use() { outer(1, inner(2)) } }";
     let given = snapshot(text);
     let when = given
         .signature_help(FileId(1), text.rfind("2)").unwrap() + 1)
@@ -93,7 +93,7 @@ fn inner_complete_call_when_cursor_precedes_inner_closer() {
 
 #[test]
 fn editor_keyword_when_reserved_name_is_retained_as_damaged_slot() {
-    let text = "module Main { fun read(**options) {} read(key:";
+    let text = "module Main { fun read(**options) {} fun use() { read(key:";
     let given = snapshot(text);
     let when = given.signature_help(FileId(1), text.len()).unwrap();
     assert_eq!(when.signatures[0].active_parameter, Some(0));
@@ -101,8 +101,7 @@ fn editor_keyword_when_reserved_name_is_retained_as_damaged_slot() {
 
 #[test]
 fn nested_partial_expression_when_only_inner_argument_is_damaged() {
-    let text =
-        "module Main { fun outer(first,second) {} fun inner(value) {} outer(1, inner(2 + )) }";
+    let text = "module Main { fun outer(first,second) {} fun inner(value) {} fun use() { outer(1, inner(2 + )) } }";
     let given = snapshot(text);
     let when = given
         .signature_help(FileId(1), text.rfind("))").unwrap())
@@ -170,10 +169,10 @@ fn method_queries_are_absent_when_header_errors_follow_closing_parenthesis() {
 #[test]
 fn method_queries_remain_usable_when_only_body_or_call_is_incomplete() {
     for text in [
-        "module Main { fun read(value, second) {} read(1,",
+        "module Main { fun read(value, second) {} fun use() { read(1,",
         "module Main { fun read(value, second) { read(1,",
         "module Main { fun read(_, _) { read(1,",
-        "module Main { fun read(_, _, *rest, key option, **kwargs, &block) {} read(1,",
+        "module Main { fun read(_, _, *rest, key option, **kwargs, &block) {} fun use() { read(1,",
     ] {
         let given = snapshot(text);
         let when = (

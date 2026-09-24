@@ -10,7 +10,7 @@ fn snapshot(text: &str) -> AnalysisSnapshot {
 
 #[test]
 fn initializer_reads_outer_when_inner_binding_shadows() {
-    let text = "module Main { let value = 1; if true { let value = value; value } }";
+    let text = "let value = 1; if true { let value = value; value }";
     let given = snapshot(text);
     let when = given.definitions(FileId(1), text.find("= value").unwrap() + 2);
     assert_eq!(when.len(), 1);
@@ -19,7 +19,7 @@ fn initializer_reads_outer_when_inner_binding_shadows() {
 
 #[test]
 fn references_distinguish_shadowed_symbols_when_names_repeat() {
-    let text = "module Main { let value = 1; if true { let value = value; value }; value }";
+    let text = "let value = 1; if true { let value = value; value }; value";
     let given = snapshot(text);
     let when = given.references(FileId(1), text.find("value").unwrap(), false);
     assert_eq!(when.len(), 2);
@@ -37,7 +37,7 @@ fn method_does_not_capture_when_body_local_exists() {
 
 #[test]
 fn closure_captures_when_outer_local_exists() {
-    let text = "module Main { let value = 1; let block = { ||; value } }";
+    let text = "let value = 1; let block = { ||; value }";
     let given = snapshot(text);
     let when = given.definitions(FileId(1), text.rfind("value").unwrap());
     assert_eq!(when[0].name_span.start, text.find("value").unwrap());

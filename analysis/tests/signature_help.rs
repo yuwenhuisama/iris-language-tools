@@ -10,7 +10,7 @@ fn snapshot(text: &str) -> AnalysisSnapshot {
 
 #[test]
 fn signature_when_parameters_include_discard_defaults_and_channels() {
-    let text = "module Main {\n/// Read docs\npublic fun read<T>(_, value = '😀', *rest: T, key option = true, **kwargs, &block) -> String {}\nread(1, 2) }";
+    let text = "module Main {\n/// Read docs\npublic fun read<T>(_, value = '😀', *rest: T, key option = true, **kwargs, &block) -> String {}\nfun use() { read(1, 2) } }";
     let given = snapshot(text);
     let help = given
         .signature_help(FileId(1), text.rfind("2)").unwrap())
@@ -47,7 +47,7 @@ fn active_parameter_when_keyword_and_rest_channels_are_mixed() {
         ("read(other: 1", 3),
     ] {
         let text = format!(
-            "module Main {{ public fun read(value, *rest, key option, **kwargs) {{}} {call}"
+            "module Main {{ public fun read(value, *rest, key option, **kwargs) {{}} fun use() {{ {call}"
         );
         let given = snapshot(&text);
         let when = given.signature_help(FileId(1), text.len()).unwrap();
@@ -67,7 +67,9 @@ fn signature_when_editor_call_is_incomplete() {
         ("read(option:", 2),
         ("read(option: 1 +", 2),
     ] {
-        let text = format!("module Main {{ public fun read(value, second, key option) {{}} {call}");
+        let text = format!(
+            "module Main {{ public fun read(value, second, key option) {{}} fun use() {{ {call}"
+        );
         let given = snapshot(&text);
         let when = given.signature_help(FileId(1), text.len()).unwrap();
         assert_eq!(
@@ -80,7 +82,7 @@ fn signature_when_editor_call_is_incomplete() {
 
 #[test]
 fn innermost_call_when_outer_and_inner_are_incomplete() {
-    let text = "module Main { public fun outer(a,b) {} public fun inner(value) {} outer(1, inner(";
+    let text = "module Main { public fun outer(a,b) {} public fun inner(value) {} fun use() { outer(1, inner(";
     let given = snapshot(text);
     let when = given.signature_help(FileId(1), text.len()).unwrap();
     assert!(when.signatures[0].label.contains("inner("));
@@ -89,7 +91,7 @@ fn innermost_call_when_outer_and_inner_are_incomplete() {
 
 #[test]
 fn signature_is_absent_when_inner_callee_is_unknown() {
-    let text = "module Main { public fun outer(a,b) {} outer(1, unknown(";
+    let text = "module Main { public fun outer(a,b) {} fun use() { outer(1, unknown(";
     let given = snapshot(text);
     let when = given.signature_help(FileId(1), text.len());
     assert_eq!(when, None);
@@ -97,7 +99,7 @@ fn signature_is_absent_when_inner_callee_is_unknown() {
 
 #[test]
 fn signature_has_no_active_parameter_when_method_has_no_parameters() {
-    let text = "module Main { public fun read() {} read() }";
+    let text = "module Main { public fun read() {} fun use() { read() } }";
     let given = snapshot(text);
     let when = given
         .signature_help(FileId(1), text.rfind("read(").unwrap() + 5)
@@ -109,7 +111,7 @@ fn signature_has_no_active_parameter_when_method_has_no_parameters() {
 #[test]
 fn signature_is_absent_when_cursor_is_outside_arguments_or_mapping_is_impossible() {
     for call in ["read(1, 2", "read(other: 1", "read(1)"] {
-        let text = format!("module Main {{ public fun read(value) {{}} {call}");
+        let text = format!("module Main {{ public fun read(value) {{}} fun use() {{ {call}");
         let given = snapshot(&text);
         let when = given.signature_help(FileId(1), text.len());
         assert_eq!(when, None, "{call}");
@@ -118,7 +120,8 @@ fn signature_is_absent_when_cursor_is_outside_arguments_or_mapping_is_impossible
 
 #[test]
 fn outer_slot_when_nested_literals_and_comments_contain_commas() {
-    let text = "module Main { public fun read(a,b,c) {} read([1,2], 'a,b', /* , */ 3) }";
+    let text =
+        "module Main { public fun read(a,b,c) {} fun use() { read(%[1,2], 'a,b', /* , */ 3) } }";
     let given = snapshot(text);
     let when = given
         .signature_help(FileId(1), text.rfind("3)").unwrap())
@@ -129,7 +132,7 @@ fn outer_slot_when_nested_literals_and_comments_contain_commas() {
 #[test]
 fn signature_is_absent_when_complete_parameter_structure_exceeds_budget() {
     let text = format!(
-        "module Main {{ public fun read(value = '{}') {{}} read(",
+        "module Main {{ public fun read(value = '{}') {{}} fun use() {{ read(",
         "😀".repeat(2000)
     );
     let given = snapshot(&text);
