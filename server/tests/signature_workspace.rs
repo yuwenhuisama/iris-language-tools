@@ -11,7 +11,7 @@ fn uri(path: &Path) -> String {
 fn signature(client: &mut Client, source: &str) -> Value {
     client.send(
         &json!({"jsonrpc":"2.0","id":2,"method":"textDocument/signatureHelp",
-        "params":{"textDocument":{"uri":source},"position":{"line":0,"character":46}}}),
+        "params":{"textDocument":{"uri":source},"position":{"line":0,"character":58}}}),
     );
     client.response()
 }
@@ -24,7 +24,7 @@ fn refreshes_signature_and_docs_when_same_package_target_overlay_changes() {
         fs::write(root.join("iris.toml"), format!(
             "manifest_version = 1\npackage_id = \"org.example.signature\"\napi_major = 1\nversion = \"1.0.0\"\niris_major = 1\nsources = [\"{source_name}\", \"{target_name}\"]\nentry_modules = []\n[permissions]\nrequired = []\noptional = []\n"
         )).unwrap();
-        let caller = "module Main { let item = Box.new(); item.read(1) }";
+        let caller = "module Main { fun run() { let item = Box.new(); item.read(1) } }";
         let original =
             "class Box {\n/// Original docs\npublic fun read(value: Integer) -> Integer {}\n}";
         fs::write(root.join(source_name), caller).unwrap();
