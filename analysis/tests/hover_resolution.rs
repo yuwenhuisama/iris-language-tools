@@ -10,7 +10,7 @@ fn snapshot(text: &str) -> AnalysisSnapshot {
 
 #[test]
 fn hover_follows_shadow_when_closure_parameter_shadows_local() {
-    let text = "module Main { let value = 1; let block = { |value: String|; value }; value }";
+    let text = "let value = 1; let block = { |value: String|; value }; value";
     let given = snapshot(text);
     let when = given
         .hover(FileId(1), text.find("value }").unwrap())
@@ -29,7 +29,7 @@ fn hover_follows_shadow_when_closure_parameter_shadows_local() {
 
 #[test]
 fn alias_hover_when_target_is_in_another_file() {
-    let caller = "from Core import Thing as Local\nmodule Main { let item: Local = Local.new() }";
+    let caller = "from Core import Thing as Local\nmodule Main { fun use() { let item: Local = Local.new() } }";
     let given = AnalysisSnapshot::new([
         SourceInput {
             id: FileId(1),
@@ -58,7 +58,7 @@ fn alias_hover_when_target_is_in_another_file() {
 
 #[test]
 fn member_hover_when_receiver_identifies_owner() {
-    let text = "class First { public fun read() -> Integer { 1 } } class Second { public fun read() -> String { 's' } } module Main { let item = First.new(); item.read() }";
+    let text = "class First { public fun read() -> Integer { 1 } } class Second { public fun read() -> String { 's' } } module Main { fun use() { let item = First.new(); item.read() } }";
     let given = snapshot(text);
     let when = given.hover(FileId(1), text.rfind("read").unwrap()).unwrap();
     assert_eq!(when.signature, "public fun read() -> Integer");
@@ -92,7 +92,7 @@ fn hover_is_absent_when_resolution_is_ambiguous_or_unsafe() {
 
 #[test]
 fn unicode_hover_when_cursor_is_on_a_character_boundary() {
-    let text = "module Main { let café = 1; café }";
+    let text = "let café = 1; café";
     let given = snapshot(text);
     let start = text.rfind("café").unwrap();
     let when = given.hover(FileId(1), start + 3).unwrap();
@@ -121,7 +121,7 @@ fn inferred_hover_when_binding_copies_known_types() {
         ("Box", None),
     ] {
         let text = format!(
-            "class Box {{}} module Main {{ fun read() -> String {{ 'yes' }}; let value = {value}; let copy = value; copy }}"
+            "class Box {{}} module Main {{ fun read() -> String {{ 'yes' }}; fun use() {{ let value = {value}; let copy = value; copy }} }}"
         );
         let given = snapshot(&text);
         let when = given.hover(FileId(1), text.rfind("copy").unwrap()).unwrap();
@@ -131,7 +131,7 @@ fn inferred_hover_when_binding_copies_known_types() {
 
 #[test]
 fn written_hover_when_initializer_is_narrower() {
-    let text = "module Main { let value: Object = 1; let copy = value }";
+    let text = "let value: Object = 1; let copy = value";
     let given = snapshot(text);
     let when = given.hover(FileId(1), text.find("copy").unwrap()).unwrap();
     assert_eq!(when.signature, "let copy: Object");
@@ -140,7 +140,7 @@ fn written_hover_when_initializer_is_narrower() {
 
 #[test]
 fn method_value_hover_when_member_is_not_called_has_no_return_type() {
-    let text = "class Box { public fun read() -> Integer { 1 } } module Main { let item = Box.new(); let value = item.read; value }";
+    let text = "class Box { public fun read() -> Integer { 1 } } module Main { fun use() { let item = Box.new(); let value = item.read; value } }";
     let given = snapshot(text);
     let when = given
         .hover(FileId(1), text.rfind("value").unwrap())

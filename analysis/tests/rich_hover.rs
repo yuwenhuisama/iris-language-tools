@@ -25,7 +25,8 @@ fn rich_hover_when_documented_method_has_semantic_owner() {
 #[test]
 fn docs_are_absent_when_attachment_is_broken() {
     for gap in ["\n", "// ordinary\n", "let other = 1;\n"] {
-        let text = format!("module Main {{\n/// Detached\n{gap}let value = 1; value }}");
+        let text =
+            format!("module Main {{ fun use() {{\n/// Detached\n{gap}let value = 1; value }} }}");
         let given = snapshot(&text);
         let when = given
             .hover(FileId(1), text.rfind("value").unwrap())
@@ -36,7 +37,7 @@ fn docs_are_absent_when_attachment_is_broken() {
 
 #[test]
 fn closure_parameter_stays_unknown_when_body_contains_types() {
-    let text = "module Main { let block = { |arg|; let local: String; arg }; block }";
+    let text = "module Main { fun use() { let block = { |arg|; let local: String; arg }; block } }";
     let given = snapshot(text);
     let when = given.hover(FileId(1), text.rfind("arg").unwrap()).unwrap();
     assert_eq!(when.signature, "arg");
@@ -73,7 +74,8 @@ fn rest_detail_when_signature_and_body_type_are_distinct() {
 
 #[test]
 fn unknown_callable_value_when_closure_body_has_typed_locals() {
-    let text = "module Main { let block = { |arg|; let local: Integer; 'result' }; block }";
+    let text =
+        "module Main { fun use() { let block = { |arg|; let local: Integer; 'result' }; block } }";
     let given = snapshot(text);
     let when = given
         .hover(FileId(1), text.rfind("block").unwrap())

@@ -24,7 +24,7 @@ fn hover_is_bounded_when_default_literal_is_oversized() {
 #[test]
 fn hover_is_bounded_when_written_type_is_oversized() {
     let name = "Type".repeat(5000);
-    let text = format!("module Main {{ let value: {name} = nil; let copy = value }}");
+    let text = format!("let value: {name} = nil; let copy = value");
     let given = snapshot(&text);
     for target in ["value:", "copy"] {
         let when = given.hover(FileId(1), text.find(target).unwrap()).unwrap();
