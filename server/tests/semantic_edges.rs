@@ -15,7 +15,7 @@ fn query(client: &mut Client, position: Value) -> Value {
 fn maps_utf16_when_definition_follows_astral_literal() {
     let mut given = Client::spawn();
     given.initialize();
-    let text = "module Main { let text = '\u{1f600}'; let value = 1; value }";
+    let text = "module Main { fun run() { let text = '\u{1f600}'; let value = 1; value } }";
     given.open("untitled:edge", text);
     let name = text.find("value").unwrap();
     let use_site = text.rfind("value").unwrap();
@@ -51,9 +51,12 @@ fn rejects_position_when_line_invalid_or_utf16_splits_surrogate() {
 fn clamps_past_eol_when_position_exceeds_last_column() {
     let mut given = Client::spawn();
     given.initialize();
-    given.open("untitled:edge", "module Main { let local = 1; local\n}");
+    given.open(
+        "untitled:edge",
+        "module Main { fun run() { let local = 1; local\n} }",
+    );
     let when = query(&mut given, json!({"line":0,"character":1000}));
-    assert_eq!(when["result"][0]["range"]["start"]["character"], 18);
+    assert_eq!(when["result"][0]["range"]["start"]["character"], 30);
     given.shutdown();
 }
 
@@ -61,7 +64,7 @@ fn clamps_past_eol_when_position_exceeds_last_column() {
 fn resolves_inner_parameter_when_outer_binding_has_same_name() {
     let mut given = Client::spawn();
     given.initialize();
-    let text = "module Main { let value = 1; fun read(value) { value } }";
+    let text = "module Main { fun run() { let value = 1; value }; fun read(value) { value } }";
     given.open("untitled:edge", text);
     let when = query(
         &mut given,
@@ -95,10 +98,13 @@ fn rejects_malformed_parameters_when_each_semantic_provider_is_called() {
 fn includes_declaration_when_references_explicitly_requests_it() {
     let mut given = Client::spawn();
     given.initialize();
-    given.open("untitled:edge", "module Main { let local = 1; local }");
+    given.open(
+        "untitled:edge",
+        "module Main { fun run() { let local = 1; local } }",
+    );
     given.send(
         &json!({"jsonrpc":"2.0","id":2,"method":"textDocument/references","params":{
-        "textDocument":{"uri":"untitled:edge"},"position":{"line":0,"character":20},
+        "textDocument":{"uri":"untitled:edge"},"position":{"line":0,"character":32},
         "context":{"includeDeclaration":true}}}),
     );
     let when = given.response();
@@ -108,7 +114,7 @@ fn includes_declaration_when_references_explicitly_requests_it() {
         .iter()
         .map(|site| site["range"]["start"]["character"].as_u64().unwrap())
         .collect();
-    assert_eq!(starts, [18, 29]);
+    assert_eq!(starts, [30, 41]);
     given.shutdown();
 }
 
@@ -116,7 +122,8 @@ fn includes_declaration_when_references_explicitly_requests_it() {
 fn keeps_known_members_when_typing_trailing_dot_with_missing_brace() {
     let mut given = Client::spawn();
     given.initialize();
-    let text = "class Box { public fun read() {} } module Main { let item = Box.new(); item.";
+    let text =
+        "class Box { public fun read() {} } module Main { fun run() { let item = Box.new(); item.";
     given.open("untitled:edge", text);
     given.send(
         &json!({"jsonrpc":"2.0","id":2,"method":"textDocument/completion","params":{
@@ -132,9 +139,12 @@ fn keeps_known_members_when_typing_trailing_dot_with_missing_brace() {
 fn forgets_closed_document_when_reopened_at_same_version() {
     let mut given = Client::spawn();
     given.initialize();
-    given.open("untitled:edge", "module Main { let local = 1; local }");
+    given.open(
+        "untitled:edge",
+        "module Main { fun run() { let local = 1; local } }",
+    );
     assert_eq!(
-        query(&mut given, json!({"line":0,"character":30}))["result"]
+        query(&mut given, json!({"line":0,"character":42}))["result"]
             .as_array()
             .unwrap()
             .len(),
@@ -143,7 +153,7 @@ fn forgets_closed_document_when_reopened_at_same_version() {
     given.send(&json!({"jsonrpc":"2.0","method":"textDocument/didClose","params":{"textDocument":{"uri":"untitled:edge"}}}));
     assert_eq!(given.receive()["params"]["diagnostics"], json!([]));
     assert_eq!(
-        query(&mut given, json!({"line":0,"character":30}))["result"],
+        query(&mut given, json!({"line":0,"character":42}))["result"],
         json!([])
     );
     given.open("untitled:edge", "module Main { local }");
@@ -156,10 +166,13 @@ fn forgets_closed_document_when_reopened_at_same_version() {
 fn answers_once_when_client_cancels_a_real_semantic_request() {
     let mut given = Client::spawn();
     given.initialize();
-    given.open("untitled:edge", "module Main { let local = 1; local }");
+    given.open(
+        "untitled:edge",
+        "module Main { fun run() { let local = 1; local } }",
+    );
     given.send(
         &json!({"jsonrpc":"2.0","id":2,"method":"textDocument/references","params":{
-        "textDocument":{"uri":"untitled:edge"},"position":{"line":0,"character":20},
+        "textDocument":{"uri":"untitled:edge"},"position":{"line":0,"character":32},
         "context":{"includeDeclaration":true}}}),
     );
     given.send(&json!({"jsonrpc":"2.0","method":"$/cancelRequest","params":{"id":2}}));

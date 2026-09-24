@@ -199,7 +199,7 @@ fn discard_parameters_preserve_real_bindings_when_methods_and_closures_are_queri
     given.initialize();
     for text in [
         "module Main { fun use(_: Integer, arg: String) -> Nil { let copy = arg; arg } }",
-        "module Main { let outer = 1; let block = { |_: Integer, arg: String|; let copy = arg; arg; outer } }",
+        "module Main { fun run() -> Nil { let outer = 1; let block = { |_: Integer, arg: String|; let copy = arg; arg; outer } } }",
     ] {
         given.open(URI, text);
         let declaration = text.find("arg:").unwrap();

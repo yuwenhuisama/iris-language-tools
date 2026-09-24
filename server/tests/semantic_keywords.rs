@@ -37,9 +37,9 @@ fn suppresses_keywords_when_cursor_is_in_protected_text() {
     let mut given = Client::spawn();
     given.initialize();
     let cases = [
-        "module Main { let value = 'vis",
+        "module Main { fun run() { let value = 'vis",
         "// comment",
-        "module Main { let value = 123",
+        "module Main { fun run() { let value = 123",
     ];
     for (index, text) in cases.iter().enumerate() {
         let uri = format!("untitled:protected{index}");
@@ -82,7 +82,7 @@ fn suppresses_keywords_when_receiver_or_namespace_is_unknown() {
 fn merges_keywords_once_when_symbols_are_available() {
     let mut given = Client::spawn();
     given.initialize();
-    let text = "module Main { let value = 1; va }";
+    let text = "module Main { fun run() { let value = 1; va } }";
     given.open("untitled:mixed", text);
     given.send(&json!({"jsonrpc":"2.0","id":2,"method":"textDocument/completion","params":{
         "textDocument":{"uri":"untitled:mixed"},"position":{"line":0,"character":text.find("va }").unwrap()+2}}}));
