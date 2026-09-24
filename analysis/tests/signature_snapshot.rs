@@ -2,7 +2,7 @@ use iris_analysis::{AnalysisSnapshot, FileId, GroupId, SourceInput};
 
 fn snapshot(target: &str, group: GroupId) -> (AnalysisSnapshot, String) {
     let caller =
-        "from Core import Box as Local\nmodule Main { let item: Local = Local.new(); item.read("
+        "from Core import Box as Local\nmodule Main { fun use() { let item: Local = Local.new(); item.read("
             .to_owned();
     let snapshot = AnalysisSnapshot::new([
         SourceInput {

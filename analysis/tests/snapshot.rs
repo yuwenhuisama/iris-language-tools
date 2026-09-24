@@ -10,7 +10,7 @@ fn input(id: u32, text: &str) -> SourceInput {
 
 #[test]
 fn four_features_rebuild_when_target_signature_changes() {
-    let caller = "import Core as Alias\nmodule Main { let item = Alias::Box.new(); let result = item.read(); item.re }";
+    let caller = "import Core as Alias\nmodule Main { fun use() { let item = Alias::Box.new(); let result = item.read(); item.re } }";
     let original = "module Core {} class Core::Box { public fun read() -> Integer { 1 } }";
     let updated = "\nmodule Core {} class Core::Box { public fun read() -> String { 'changed' } }";
     let given = AnalysisSnapshot::new([input(1, caller), input(2, original)]);
@@ -108,7 +108,7 @@ fn generic_method_return_stays_unknown_when_arguments_are_not_substituted() {
 
 #[test]
 fn type_alias_navigation_when_annotation_names_alias() {
-    let text = "type Text = String; module Main { let value: Text = 's' }";
+    let text = "type Text = String; module Main { fun use() { let value: Text = 's' } }";
     let given = AnalysisSnapshot::new([input(1, text)]);
     let when = given.definitions(FileId(1), text.rfind("Text").unwrap());
     assert_eq!(when[0].name_span.start, text.find("Text").unwrap());
