@@ -33,7 +33,7 @@ fn advertises_triggers_when_initialized() {
 fn returns_substrings_when_offset_support_is_absent() {
     let mut given = Client::spawn();
     given.initialize();
-    let text = "module Main { public fun read(_, value = '\u{1f600}', *rest, key option, **kwargs) {} read(1, 2, 3) }";
+    let text = "module Main { public fun read(_, value = '\u{1f600}', *rest, key option, **kwargs) {} fun run() { read(1, 2, 3) } }";
     given.open("untitled:signature", text);
 
     let when = signature(&mut given, text, text.rfind("3)").unwrap());
@@ -82,12 +82,12 @@ fn maps_slots_when_nested_commas_keywords_and_incomplete_calls_occur() {
         ("read(1,", 1),
         ("read(option:", 3),
         ("read(other: 1", 4),
-        ("read([1,2], 'a,b', /* , */ 3", 2),
+        ("read(%[1,2], 'a,b', /* , */ 3", 2),
         ("read(inner(1,2),", 1),
         ("read(1, inner(", 0),
     ] {
         let text = format!(
-            "module Main {{ public fun read(_, value = 1, *rest, key option, **kwargs) {{}} public fun inner(a,b) {{}} {call}"
+            "module Main {{ public fun read(_, value = 1, *rest, key option, **kwargs) {{}} public fun inner(a,b) {{}} fun run() {{ {call}"
         );
         given.open("untitled:signature", &text);
 
@@ -123,7 +123,7 @@ fn returns_null_when_callee_or_argument_mapping_is_unknown() {
         "read(1, 2",
         "read(1)",
     ] {
-        let text = format!("module Main {{ public fun read(value) {{}} {call}");
+        let text = format!("module Main {{ public fun read(value) {{}} fun run() {{ {call}");
         given.open("untitled:signature", &text);
 
         let when = signature(&mut given, &text, text.len());
@@ -139,7 +139,7 @@ fn returns_null_when_callee_or_argument_mapping_is_unknown() {
 fn omits_active_parameter_when_zero_argument_call_has_existing_closer() {
     let mut given = Client::spawn();
     given.initialize();
-    let text = "module Main { public fun read() {} read() }";
+    let text = "module Main { public fun read() {} fun run() { read() } }";
     given.open("untitled:signature", text);
 
     let when = signature(&mut given, text, text.rfind(')').unwrap());
@@ -154,7 +154,7 @@ fn omits_active_parameter_when_zero_argument_call_has_existing_closer() {
 fn selects_next_slot_when_trailing_comma_precedes_existing_closer() {
     let mut given = Client::spawn();
     given.initialize();
-    let text = "module Main { public fun read(first, second) {} read(1,) }";
+    let text = "module Main { public fun read(first, second) {} fun run() { read(1,) } }";
     given.open("untitled:signature", text);
 
     let when = signature(&mut given, text, text.rfind(')').unwrap());

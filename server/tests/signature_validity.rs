@@ -28,13 +28,14 @@ fn queries_return_null_when_strict_parser_rejects_method_header() {
         "read(value = , second)",
     ] {
         for body in [" {} ", "\n{}\n", "\n"] {
-            let complete = format!("module Main {{ fun {header}{body}read(1, 2) }}");
+            let complete =
+                format!("module Main {{ fun {header}{body}fun run() {{ read(1, 2) }} }}");
             assert_eq!(
                 format_document(&complete),
                 FormatOutcome::Skipped(SkipReason::ParseDiagnostics),
                 "strict parser must reject: {complete}"
             );
-            let text = format!("module Main {{ fun {header}{body}read(1,");
+            let text = format!("module Main {{ fun {header}{body}fun run() {{ read(1,");
             given.open("untitled:signature-validity", &text);
 
             for (method, byte) in [
@@ -59,7 +60,7 @@ fn queries_remain_usable_when_valid_header_has_incomplete_body_and_call() {
     let mut given = Client::spawn();
     given.initialize();
     for text in [
-        "module Main { fun read(value, second) {} read(1,",
+        "module Main { fun read(value, second) {} fun run() { read(1,",
         "module Main { fun read(value, second) { read(1,",
         "module Main { fun read(_, _) { read(1,",
     ] {

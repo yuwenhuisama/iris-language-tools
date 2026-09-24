@@ -21,7 +21,7 @@ fn signature(client: &mut Client, source: &str) -> Value {
     client.response()
 }
 
-const SOURCE: &str = "module Main {\n/// <img> [run](command:bad) & `code`\npublic fun read(first = '\u{1f600}', second = 2) {}\nread(1,";
+const SOURCE: &str = "module Main {\n/// <img> [run](command:bad) & `code`\npublic fun read(first = '\u{1f600}', second = 2) {}\nfun run() { read(1,";
 
 #[test]
 fn returns_utf16_offsets_when_client_explicitly_supports_them() {
