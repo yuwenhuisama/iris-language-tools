@@ -60,7 +60,23 @@ impl Node<'_> {
 pub fn build<'a>(pieces: &[Piece<'a>]) -> Result<Vec<Node<'a>>, SkipReason> {
     let mut stack: Vec<Group<'a>> = Vec::new();
     let mut root = Vec::new();
-    for &piece in pieces {
+    let mut index = 0;
+    while index < pieces.len() {
+        let mut piece = pieces[index];
+        if piece.kind == Kind::Code
+            && piece.text == "%"
+            && pieces.get(index + 1).is_some_and(|next| {
+                next.kind == Kind::Code && matches!(next.text, "[" | "{") && piece.end == next.start
+            })
+        {
+            piece.text = if pieces[index + 1].text == "[" {
+                "%["
+            } else {
+                "%{"
+            };
+            piece.end = pieces[index + 1].end;
+            index += 1;
+        }
         let target = match stack.last_mut() {
             Some(group) => &mut group.children,
             None => &mut root,
@@ -68,7 +84,7 @@ pub fn build<'a>(pieces: &[Piece<'a>]) -> Result<Vec<Node<'a>>, SkipReason> {
         let closer = match (piece.kind, piece.text) {
             (Kind::Code, "{" | "%{") => Some("}"),
             (Kind::Code, "(") => Some(")"),
-            (Kind::Code, "[") => Some("]"),
+            (Kind::Code, "[" | "%[") => Some("]"),
             _ => None,
         };
         if let Some(close) = closer {
@@ -94,6 +110,7 @@ pub fn build<'a>(pieces: &[Piece<'a>]) -> Result<Vec<Node<'a>>, SkipReason> {
         } else {
             target.push(Node::Token(piece));
         }
+        index += 1;
     }
     if !stack.is_empty() {
         return Err(SkipReason::UnclosedDelimiter);
@@ -108,7 +125,7 @@ fn role(open: &str, before: &[Node<'_>]) -> Role {
     });
     match open {
         "[" if ends_expression(previous) => Role::Index,
-        "%{" | "[" => Role::List,
+        "%{" | "%[" | "[" => Role::List,
         "(" if ends_expression(previous)
             && !matches!(previous, "if" | "while" | "catch" | "match" | "return") =>
         {

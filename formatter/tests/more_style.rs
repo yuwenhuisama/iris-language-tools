@@ -53,8 +53,8 @@ fn collapses_closure_header_spacing_when_bars_and_arrow_are_separate() {
 #[test]
 fn formats_nested_delimiters_when_multiple_closers_share_a_line() {
     golden(
-        "fun f(){let data=%{\nkey:[\ncall(\n1\n)]\n}}",
-        "fun f() {\n  let data = %{\n    key: [\n      call(\n        1,\n      ),\n    ],\n  }\n}\n",
+        "fun f(){let data=%{\nkey:%[\ncall(\n1\n)]\n}}",
+        "fun f() {\n  let data = %{\n    key: %[\n      call(\n        1,\n      ),\n    ],\n  }\n}\n",
     );
 }
 
