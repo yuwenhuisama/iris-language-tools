@@ -17,17 +17,20 @@ fn query(client: &mut Client, method: &str, uri: &str, position: Value) -> Value
 fn resolves_definition_when_local_is_used_in_unsaved_source() {
     let mut given = Client::spawn();
     given.initialize();
-    given.open("untitled:semantic", "module Main { let local = 1; local }");
+    given.open(
+        "untitled:semantic",
+        "module Main { fun run() { let local = 1; local } }",
+    );
     let when = query(
         &mut given,
         "textDocument/definition",
         "untitled:semantic",
-        json!({"line":0,"character":30}),
+        json!({"line":0,"character":42}),
     );
     assert_eq!(
         when["result"],
         json!([{"uri":"untitled:semantic", "range":{
-        "start":{"line":0,"character":18},"end":{"line":0,"character":23}}}])
+        "start":{"line":0,"character":30},"end":{"line":0,"character":35}}}])
     );
     given.shutdown();
 }
@@ -36,17 +39,20 @@ fn resolves_definition_when_local_is_used_in_unsaved_source() {
 fn excludes_declaration_when_references_context_requests_uses_only() {
     let mut given = Client::spawn();
     given.initialize();
-    given.open("untitled:semantic", "module Main { let local = 1; local }");
+    given.open(
+        "untitled:semantic",
+        "module Main { fun run() { let local = 1; local } }",
+    );
     let when = query(
         &mut given,
         "textDocument/references",
         "untitled:semantic",
-        json!({"line":0,"character":20}),
+        json!({"line":0,"character":32}),
     );
     assert_eq!(
         when["result"],
         json!([{"uri":"untitled:semantic", "range":{
-        "start":{"line":0,"character":29},"end":{"line":0,"character":34}}}])
+        "start":{"line":0,"character":41},"end":{"line":0,"character":46}}}])
     );
     given.shutdown();
 }
@@ -55,7 +61,7 @@ fn excludes_declaration_when_references_context_requests_uses_only() {
 fn completes_member_when_identifier_is_partial() {
     let mut given = Client::spawn();
     given.initialize();
-    let text = "class Box { public fun read() {} } module Main { let item = Box.new(); item.re }";
+    let text = "class Box { public fun read() {} } module Main { fun run() { let item = Box.new(); item.re } }";
     given.open("untitled:semantic", text);
     let start = text.rfind("re }").unwrap();
     let when = query(
@@ -80,17 +86,17 @@ fn returns_type_hint_when_requested_range_contains_inferred_binding() {
     given.initialize();
     given.open(
         "untitled:semantic",
-        "module Main { let local = 1; let other = 2 }",
+        "module Main { fun run() { let local = 1; let other = 2 } }",
     );
     given.send(
         &json!({"jsonrpc":"2.0","id":2,"method":"textDocument/inlayHint",
         "params":{"textDocument":{"uri":"untitled:semantic"},"range":{
-        "start":{"line":0,"character":18},"end":{"line":0,"character":24}}}}),
+        "start":{"line":0,"character":30},"end":{"line":0,"character":36}}}}),
     );
     let when = given.response();
     assert_eq!(
         when["result"],
-        json!([{"position":{"line":0,"character":23},
+        json!([{"position":{"line":0,"character":35},
         "label":": Integer","kind":1}])
     );
     given.shutdown();

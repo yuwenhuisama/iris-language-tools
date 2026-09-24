@@ -33,7 +33,7 @@ fn manifest(root: &Path, sources: &[&str]) {
 fn definition(client: &mut Client, source: &str) -> Value {
     client.send(
         &json!({"jsonrpc":"2.0","id":2,"method":"textDocument/definition","params":{
-        "textDocument":{"uri":source},"position":{"line":0,"character":25}}}),
+        "textDocument":{"uri":source},"position":{"line":0,"character":37}}}),
     );
     client.response()
 }
@@ -45,7 +45,7 @@ fn resolves_cross_file_target_when_package_and_unsaved_overlay_share_identity() 
     manifest(&root, &["main.iris", "types.iris"]);
     fs::write(
         root.join("main.iris"),
-        "module Main { let item = Box.new() }",
+        "module Main { fun run() { let item = Box.new() } }",
     )
     .unwrap();
     fs::write(root.join("types.iris"), "class Old {}").unwrap();
@@ -69,7 +69,7 @@ fn refreshes_disk_target_when_watched_source_changes() {
     manifest(&root, &["main.iris", "types.iris"]);
     fs::write(
         root.join("main.iris"),
-        "module Main { let item = Box.new() }",
+        "module Main { fun run() { let item = Box.new() } }",
     )
     .unwrap();
     fs::write(root.join("types.iris"), "class Box {}").unwrap();
@@ -97,14 +97,14 @@ fn rejects_exhaustive_references_when_manifest_inventory_is_incomplete() {
     manifest(&root, &["main.iris", "missing.iris"]);
     fs::write(
         root.join("main.iris"),
-        "module Main { let local = 1; local }",
+        "module Main { fun run() { let local = 1; local } }",
     )
     .unwrap();
     let mut client = Client::spawn();
     initialize(&mut client, &root);
     client.send(
         &json!({"jsonrpc":"2.0","id":2,"method":"textDocument/references","params":{
-        "textDocument":{"uri":uri(&root.join("main.iris"))},"position":{"line":0,"character":30},
+        "textDocument":{"uri":uri(&root.join("main.iris"))},"position":{"line":0,"character":42},
         "context":{"includeDeclaration":true}}}),
     );
     let when = client.response();
@@ -119,7 +119,7 @@ fn removes_package_sources_when_workspace_folder_is_removed() {
     manifest(&root, &["main.iris", "types.iris"]);
     fs::write(
         root.join("main.iris"),
-        "module Main { let item = Box.new() }",
+        "module Main { fun run() { let item = Box.new() } }",
     )
     .unwrap();
     fs::write(root.join("types.iris"), "class Box {}").unwrap();
@@ -149,7 +149,7 @@ fn adds_package_sources_when_workspace_folder_is_added() {
     manifest(&root, &["main.iris", "types.iris"]);
     fs::write(
         root.join("main.iris"),
-        "module Main { let item = Box.new() }",
+        "module Main { fun run() { let item = Box.new() } }",
     )
     .unwrap();
     fs::write(root.join("types.iris"), "class Box {}").unwrap();
@@ -173,7 +173,7 @@ fn uses_root_uri_when_workspace_folders_are_absent() {
     manifest(&root, &["main.iris", "types.iris"]);
     fs::write(
         root.join("main.iris"),
-        "module Main { let item = Box.new() }",
+        "module Main { fun run() { let item = Box.new() } }",
     )
     .unwrap();
     fs::write(root.join("types.iris"), "class Box {}").unwrap();
@@ -194,7 +194,10 @@ fn keeps_standalone_files_isolated_when_names_match_across_buffers() {
     let mut given = Client::spawn();
     given.initialize();
     given.open("untitled:types", "class Box {}");
-    given.open("untitled:main", "module Main { let item = Box.new() }");
+    given.open(
+        "untitled:main",
+        "module Main { fun run() { let item = Box.new() } }",
+    );
     let when = definition(&mut given, "untitled:main");
     assert_eq!(when["result"], json!([]));
     given.shutdown();
