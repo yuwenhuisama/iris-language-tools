@@ -71,14 +71,14 @@ fn annotation(owner: &str) -> &str {
 
 fn receiver_prefix(member: &BuiltinMember) -> String {
     match member.surface {
-        Surface::Global => "module Main { ".into(),
-        Surface::Service => format!("module Main {{ {}.", member.owner),
+        Surface::Global => "module Main { fun use() { ".into(),
+        Surface::Service => format!("module Main {{ fun use() {{ {}.", member.owner),
         Surface::Class | Surface::Property if member.owner == "Module" => {
-            "module Target {} module Main { Target.".into()
+            "module Target {} module Main { fun use() { Target.".into()
         }
         Surface::Class => match member.owner {
             "Class" => "module Main { fun use(value: Class) { value.".into(),
-            owner => format!("module Main {{ {owner}."),
+            owner => format!("module Main {{ fun use() {{ {owner}."),
         },
         Surface::Property
             if member.receiver.is_none()
@@ -88,7 +88,7 @@ fn receiver_prefix(member: &BuiltinMember) -> String {
                         && candidate.surface == Surface::Class
                 }) && iris_builtins::class_names().contains(&member.owner) =>
         {
-            format!("module Main {{ {}.", member.owner)
+            format!("module Main {{ fun use() {{ {}.", member.owner)
         }
         Surface::Instance | Surface::Property => format!(
             "module Main {{ fun use(value: {}) {{ value.",

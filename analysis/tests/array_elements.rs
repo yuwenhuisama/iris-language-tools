@@ -28,8 +28,8 @@ fn preserves_structural_facts_when_copying_or_slicing_arrays() {
     for (setup, expression, expected) in [
         ("let a='abc'.split(''); let copy=a;", "copy[0]", "String?"),
         ("let a='abc'.split(''); let copy=(a);", "copy[0]", "String?"),
-        ("let a: Array<String> = [];", "a[0]", "String?"),
-        ("let a: Array<Integer> = [];", "a[0]", "Integer?"),
+        ("let a: Array<String> = %[];", "a[0]", "String?"),
+        ("let a: Array<Integer> = %[];", "a[0]", "Integer?"),
         ("let a='abc'.split(''); let index=0;", "a[index]", "String?"),
         ("let a='abc'.split('');", "a[0 ..< 2]", "Array<String>"),
         (
@@ -56,9 +56,9 @@ fn preserves_structural_facts_when_copying_or_slicing_arrays() {
 #[test]
 fn refuses_element_facts_when_identity_or_contents_are_uncertain() {
     for (setup, expression) in [
-        ("let a: Dynamic<Array<String>> = [];", "a[0]"),
-        ("let a: Array<Dynamic<String>> = [];", "a[0]"),
-        ("let a=[];", "a[0]"),
+        ("let a: Dynamic<Array<String>> = %[];", "a[0]"),
+        ("let a: Array<Dynamic<String>> = %[];", "a[0]"),
+        ("let a=%[];", "a[0]"),
         ("let a='abc'.split('');", "a[unknown]"),
         ("let a='abc'.split('');", "a['key']"),
         ("mut a='abc'.split('');", "a[0]"),
@@ -68,10 +68,10 @@ fn refuses_element_facts_when_identity_or_contents_are_uncertain() {
         ("let a='abc'.split(''); let copy=a; copy.push(1);", "a[0]"),
         ("let a='abc'.split(''); mut copy=a;", "a[0]"),
         ("let a='abc'.split(''); unknown(a);", "a[0]"),
-        ("let a='abc'.split(''); let stored=[a];", "a[0]"),
+        ("let a='abc'.split(''); let stored=%[a];", "a[0]"),
         ("let a='abc'.split(''); let closure={ a };", "a[0]"),
-        ("class String {} let a: Array<String> = [];", "a[0]"),
-        ("class Array<T> {} let a: Array<String> = [];", "a[0]"),
+        ("class String {} let a: Array<String> = %[];", "a[0]"),
+        ("class Array<T> {} let a: Array<String> = %[];", "a[0]"),
         ("open class String {} let a='abc'.split('');", "a[0]"),
         ("open class Array {} let a='abc'.split('');", "a[0]"),
         ("let a=Object.new().to_string;", "a.split('')[0]"),
@@ -135,8 +135,8 @@ fn emits_structural_hints_when_indexing_split_result() {
 #[test]
 fn refuses_element_facts_when_constants_expose_arrays_to_other_files() {
     for setup in [
-        "const Parts='ffff'.split(''); let b=Parts[0];",
-        "let a='ffff'.split(''); const Parts=a; let b=a[0];",
+        "const Parts='ffff'.split(''); fun read() { let b=Parts[0]; }",
+        "const a='ffff'.split(''); const Parts=a; fun read() { let b=a[0]; }",
     ] {
         let text = format!("module Core {{ {setup} }}");
         let given = AnalysisSnapshot::new([
@@ -148,7 +148,7 @@ fn refuses_element_facts_when_constants_expose_arrays_to_other_files() {
             SourceInput {
                 id: FileId(2),
                 group: GroupId(1),
-                text: "module Other { Core::Parts.push(1); }".into(),
+                text: "module Other { fun change() { Core::Parts.push(1); } }".into(),
             },
         ]);
 
