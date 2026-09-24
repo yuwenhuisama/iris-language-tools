@@ -28,6 +28,8 @@ does not access the filesystem, execute Iris, spawn processes, or log.
 `Continuation`, `LexicalDiagnostics`, `MismatchedDelimiter`, `UnclosedDelimiter`,
 `UncertainProtectedRange`, `ParseDiagnostics`, `CandidateParseDiagnostics`,
 `SemanticMismatch`, and `TokenMismatch`.
+`UnsupportedSyntax` is returned for optional navigation and postfix non-null
+syntax while their layout is not supported.
 
 ## Formatting
 
