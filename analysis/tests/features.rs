@@ -10,7 +10,7 @@ fn snapshot(text: &str) -> AnalysisSnapshot {
 
 #[test]
 fn members_resolve_when_receivers_have_distinct_owners() {
-    let text = "class First { public fun read() -> Integer { 1 } } class Second { public fun read() -> String { 's' } } module Main { let item = First.new(); item.read() }";
+    let text = "class First { public fun read() -> Integer { 1 } } class Second { public fun read() -> String { 's' } } module Main { fun use() { let item = First.new(); item.read() } }";
     let given = snapshot(text);
     let when = given.definitions(FileId(1), text.rfind("read").unwrap());
     assert_eq!(when[0].name_span.start, text.find("read").unwrap());
@@ -18,7 +18,7 @@ fn members_resolve_when_receivers_have_distinct_owners() {
 
 #[test]
 fn member_completion_replaces_partial_identifier_when_receiver_known() {
-    let text = "class Box { public fun read() {} private fun secret() {} public class fun build() {} } module Main { let item = Box.new(); item.re }";
+    let text = "class Box { public fun read() {} private fun secret() {} public class fun build() {} } module Main { fun use() { let item = Box.new(); item.re } }";
     let given = snapshot(text);
     let start = text.rfind("re }").unwrap();
     let when = given.completions(FileId(1), start + 2);
@@ -40,7 +40,7 @@ fn member_completion_replaces_partial_identifier_when_receiver_known() {
 
 #[test]
 fn hints_preserve_default_contract_when_method_annotations_omitted() {
-    let text = "module Main { fun read(value = 1) { 2 }; let local = 1; let copy = local; let result = read() }";
+    let text = "module Main { fun read(value = 1) { 2 }; fun use() { let local = 1; let copy = local; let result = read() } }";
     let given = snapshot(text);
     let when = given.inlay_hints(
         FileId(1),
@@ -80,7 +80,8 @@ fn member_completion_is_empty_when_receiver_dynamic() {
 
 #[test]
 fn trailing_dot_keeps_known_members_when_owner_body_has_missing_brace() {
-    let text = "class Box { public fun read() {} } module Main { let item = Box.new(); item.";
+    let text =
+        "class Box { public fun read() {} } module Main { fun use() { let item = Box.new(); item.";
     let given = snapshot(text);
     let when = given.completions(FileId(1), text.len());
     assert_eq!(
@@ -95,7 +96,7 @@ fn trailing_dot_keeps_known_members_when_owner_body_has_missing_brace() {
 
 #[test]
 fn completion_skips_protected_text_when_inside_literal() {
-    let text = "module Main { let visible = 1; let text = 'vis' }";
+    let text = "module Main { fun use() { let visible = 1; let text = 'vis' } }";
     let given = snapshot(text);
     let when = given.completions(FileId(1), text.find("vis'").unwrap() + 3);
     assert!(when.items.is_empty());
@@ -104,7 +105,7 @@ fn completion_skips_protected_text_when_inside_literal() {
 #[test]
 fn imports_follow_explicit_alias_when_target_is_in_same_group() {
     let target = "module Core {} class Core::Thing {}";
-    let text = "from Core import Thing as Local\nmodule Main { let item: Local = Local.new() }";
+    let text = "from Core import Thing as Local\nmodule Main { fun use() { let item: Local = Local.new() } }";
     let given = AnalysisSnapshot::new([
         SourceInput {
             id: FileId(1),

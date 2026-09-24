@@ -10,8 +10,7 @@ fn snapshot(text: &str) -> AnalysisSnapshot {
 
 #[test]
 fn members_distinguish_class_surface_when_receiver_is_class_object() {
-    let text =
-        "class Box { public fun read() {} public class fun build() {} } module Main { Box. }";
+    let text = "class Box { public fun read() {} public class fun build() {} } module Main { fun use() { Box. } }";
     let given = snapshot(text);
     let when = given.completions(FileId(1), text.rfind("Box.").unwrap() + 4);
     assert_eq!(
@@ -57,7 +56,7 @@ fn members_distinguish_class_surface_when_receiver_is_class_object() {
 
 #[test]
 fn method_references_exclude_other_owner_when_selectors_match() {
-    let text = "class First { public fun read() {} } class Second { public fun read() {} } module Main { First.new().read(); Second.new().read() }";
+    let text = "class First { public fun read() {} } class Second { public fun read() {} } module Main { fun use() { First.new().read(); Second.new().read() } }";
     let given = snapshot(text);
     let when = given.references(FileId(1), text.find("read").unwrap(), false);
     assert_eq!(when.len(), 1);
@@ -66,7 +65,7 @@ fn method_references_exclude_other_owner_when_selectors_match() {
 
 #[test]
 fn prefix_keeps_definition_when_later_scope_closer_is_missing() {
-    let text = "module Main { let value = 1; value";
+    let text = "module Main { fun use() { let value = 1; value";
     let given = snapshot(text);
     let when = given.definitions(FileId(1), text.rfind("value").unwrap());
     assert_eq!(when[0].name_span.start, text.find("value").unwrap());
@@ -92,7 +91,7 @@ fn literal_completion_is_empty_when_query_is_numeric_or_symbol() {
 
 #[test]
 fn byte_text_hints_when_literals_are_distinct_mutability_kinds() {
-    let text = "module Main { let text = 's'; let mutable = m's'; let bytes = b's'; let array = mb's'; let symbol = :yes; let truth = true; let nothing = nil }";
+    let text = "let text = 's'; let mutable = m's'; let bytes = b's'; let array = mb's'; let symbol = :yes; let truth = true; let nothing = nil";
     let given = snapshot(text);
     let when = given.inlay_hints(
         FileId(1),
@@ -119,7 +118,7 @@ fn byte_text_hints_when_literals_are_distinct_mutability_kinds() {
 
 #[test]
 fn conditional_member_is_absent_when_declaration_is_dynamic_only() {
-    let text = "class Box { if true { public fun hidden() {} } public fun shown() {} } module Main { Box.new(). }";
+    let text = "class Box { public fun shown() {} } module Main { fun use() { if true { Box.open() { |target|; target.define_method(:hidden) { nil } } }; Box.new(). } }";
     let given = snapshot(text);
     let when = given.completions(FileId(1), text.find("new().").unwrap() + 6);
     assert_eq!(

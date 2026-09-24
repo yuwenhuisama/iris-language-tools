@@ -10,7 +10,7 @@ fn snapshot(text: &str) -> AnalysisSnapshot {
 
 #[test]
 fn local_hover_when_declaration_and_use_share_identity() {
-    let text = "module Main { let value = 1; value }";
+    let text = "let value = 1; value";
     let given = snapshot(text);
     for start in [text.find("value").unwrap(), text.rfind("value").unwrap()] {
         let when = given.hover(FileId(1), start).unwrap();
@@ -28,7 +28,7 @@ fn local_hover_when_declaration_and_use_share_identity() {
 
 #[test]
 fn hover_is_absent_when_cursor_is_after_name() {
-    let text = "module Main { let value = 1; value }";
+    let text = "let value = 1; value";
     let given = snapshot(text);
     let when = given.hover(FileId(1), text.rfind("value").unwrap() + 5);
     assert_eq!(when, None);
@@ -100,7 +100,7 @@ fn rest_hover_when_body_type_differs_from_signature_annotation() {
 
 #[test]
 fn written_type_hover_when_typeof_is_not_evaluated() {
-    let text = "module Main { let value: typeof(seed()) = 1; value }";
+    let text = "let value: typeof(seed()) = 1; value";
     let given = snapshot(text);
     let when = given
         .hover(FileId(1), text.rfind("value").unwrap())
@@ -112,11 +112,7 @@ fn written_type_hover_when_typeof_is_not_evaluated() {
 #[test]
 fn declaration_hover_when_binding_has_source_modifiers() {
     for (source, target, expected) in [
-        (
-            "module Main { mut value = 1 }",
-            "value",
-            "mut value: Integer",
-        ),
+        ("mut value = 1", "value", "mut value: Integer"),
         (
             "module Main { const Value = 's' }",
             "Value",
