@@ -19,7 +19,7 @@ async function bounded(promise, milliseconds = 10000) {
 exports.run = async function () {
   const fixture = process.env.IRIS_STARTUP_FIXTURE;
   const marker = `${fixture}.initialized`;
-  const source = 'module Main { let value=1; value; }';
+  const source = 'module Main { fun use() { let value=1; value; } }';
   const file = path.join(process.env.IRIS_STARTUP_WORKSPACE, 'pending.ir');
   await fs.writeFile(file, source);
   const events = fs.watch(path.dirname(marker), { signal: AbortSignal.timeout(10000) });

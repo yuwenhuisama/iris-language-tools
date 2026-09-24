@@ -10,7 +10,7 @@ exports.run = async function () {
   const extension = vscode.extensions.getExtension('iris-local.iris-language-tools');
   assert.ok(extension);
   assert.equal(extension.isActive, false, 'Fresh host must not pre-activate Iris');
-  const source = 'module Main { let value=1; value;\n/// Read docs\nfun read(value) { value } read(1) }';
+  const source = 'module Main { fun use() { let value=1; value; }\n/// Read docs\nfun read(value) { value } fun call() { read(1) } }';
   const suffix = process.env.IRIS_STARTUP_SUFFIX;
   assert.ok(['.ir', '.iris'].includes(suffix));
   const file = path.join(process.env.IRIS_STARTUP_WORKSPACE, `automatic${suffix}`);
@@ -60,7 +60,7 @@ exports.run = async function () {
   assert.ok(document.getText().includes('let value = 1'));
   console.log(`PASS: actual ${suffix} autoactivation, exact shadow-safe references, definitions, Hover, completion, inlay hints and applied formatting`);
 
-  const members = 'class Box { public fun read() {} private fun secret() {} public class fun build() {} } module Main { let item = Box.new(); item.re }';
+  const members = 'class Box { public fun read() {} private fun secret() {} public class fun build() {} } module Main { fun use() { let item = Box.new(); item.re } }';
   await replace(editor, members);
   await eventually('.ir source-defined member completion', async () => {
     const result = await provider('CompletionItem', document, position(members, members.lastIndexOf('re }') + 2));

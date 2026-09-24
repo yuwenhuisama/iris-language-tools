@@ -31,7 +31,7 @@ async function assertSignature(document, cursor, expected) {
 exports.assertSignature = assertSignature;
 
 exports.verifySignatures = async function () {
-  const declaration = 'module Main {\n/// Choose a value.\npublic fun choose(_, value = \'😀\', *rest, key option, **kwargs) -> String {}\npublic fun inner(item) {}\n';
+  const declaration = 'module Main {\n/// Choose a value.\npublic fun choose(_, value = \'😀\', *rest, key option, **kwargs) -> String {}\npublic fun inner(item) {}\nfun use() { ';
   const document = await vscode.workspace.openTextDocument({ language: 'iris', content: `${declaration}choose(` });
   const editor = await vscode.window.showTextDocument(document);
   try {
@@ -61,7 +61,7 @@ exports.verifySignatures = async function () {
 };
 
 exports.verifySignatureTyping = async function () {
-  const declaration = 'module Main {\n/// Choose a value.\npublic fun choose(_, value) -> String {}\n';
+  const declaration = 'module Main {\n/// Choose a value.\npublic fun choose(_, value) -> String {}\nfun use() { ';
   const document = await vscode.workspace.openTextDocument({ language: 'iris', content: declaration + 'choose' });
   const editor = await vscode.window.showTextDocument(document, { preserveFocus: false });
   try {
