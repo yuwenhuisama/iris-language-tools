@@ -10,7 +10,8 @@ fn separates_outer_and_shadow_references_when_ir_buffer_has_repeated_names() {
     let mut given = Client::spawn();
     let capabilities = given.initialize()["result"]["capabilities"].clone();
     assert_eq!(capabilities["referencesProvider"], true);
-    let source = "module Main { let value = 1; if true { let value = value; value }; value }";
+    let source =
+        "module Main { fun run() { let value = 1; if true { let value = value; value }; value } }";
     given.open(URI, source);
     let outer = source.find("value").unwrap();
     let inner = source.find("value = value").unwrap();
@@ -56,9 +57,9 @@ fn completes_source_members_when_ir_buffer_has_prefix_or_trailing_dot() {
         capabilities["completionProvider"]["triggerCharacters"],
         json!([".", ":"])
     );
-    for (suffix, prefix, incomplete) in [("re }", 2, false), ("", 0, true)] {
+    for (suffix, prefix, incomplete) in [("re } }", 2, false), ("", 0, true)] {
         let source = format!(
-            "class Box {{ public fun read() {{}} }} module Main {{ let item = Box.new(); item.{suffix}"
+            "class Box {{ public fun read() {{}} }} module Main {{ fun run() {{ let item = Box.new(); item.{suffix}"
         );
         given.open(URI, &source);
         let start = source.rfind("item.").unwrap() + 5;

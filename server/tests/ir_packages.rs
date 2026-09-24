@@ -19,7 +19,7 @@ fn resolves_mixed_suffix_packages_when_disk_watched_and_overlay_targets_change()
                 .unwrap()
                 .to_string()
         };
-        let source = "module Main {\nlet item = Box.new()\nitem.re\n}";
+        let source = "module Main {\nfun use() {\nlet item = Box.new()\nitem.re\n}\n}";
         fs::write(root.join(main), source).unwrap();
         fs::write(root.join(types), "class Box { public fun read() {} }").unwrap();
         fs::write(root.join("iris.toml"), format!(
@@ -51,7 +51,7 @@ fn resolves_mixed_suffix_packages_when_disk_watched_and_overlay_targets_change()
                 _ => unreachable!(),
             }
             let position =
-                json!({"textDocument":{"uri":uri(main)},"position":{"line":1,"character":12}});
+                json!({"textDocument":{"uri":uri(main)},"position":{"line":2,"character":12}});
             let when = query(&mut client, "textDocument/definition", &position);
             let declaration = json!({"uri":uri(types),"range":{
                 "start":{"line":line,"character":6},"end":{"line":line,"character":9}}});
@@ -64,13 +64,13 @@ fn resolves_mixed_suffix_packages_when_disk_watched_and_overlay_targets_change()
             assert_eq!(locations.len(), 2);
             assert!(locations.contains(&declaration));
             assert!(locations.contains(&json!({"uri":uri(main),"range":{
-                "start":{"line":1,"character":11},"end":{"line":1,"character":14}}})));
+                "start":{"line":2,"character":11},"end":{"line":2,"character":14}}})));
 
             let when = query(
                 &mut client,
                 "textDocument/completion",
                 &json!({
-                "textDocument":{"uri":uri(main)},"position":{"line":2,"character":7}}),
+                "textDocument":{"uri":uri(main)},"position":{"line":3,"character":7}}),
             );
             assert_eq!(when["result"]["isIncomplete"], false);
             let items = when["result"]["items"].as_array().unwrap();
@@ -79,7 +79,7 @@ fn resolves_mixed_suffix_packages_when_disk_watched_and_overlay_targets_change()
             assert_eq!(
                 items[0]["textEdit"],
                 json!({"newText":member,"range":{
-                "start":{"line":2,"character":5},"end":{"line":2,"character":7}}})
+                "start":{"line":3,"character":5},"end":{"line":3,"character":7}}})
             );
         }
 
@@ -93,8 +93,8 @@ fn resolves_mixed_suffix_packages_when_disk_watched_and_overlay_targets_change()
         assert_eq!(
             when["result"],
             json!([{"range":{
-            "start":{"line":0,"character":0},"end":{"line":3,"character":1}},
-            "newText":"module Main {\n  let item = Box.new()\n  item.re\n}\n"}])
+            "start":{"line":0,"character":0},"end":{"line":5,"character":1}},
+            "newText":"module Main {\n  fun use() {\n    let item = Box.new()\n    item.re\n  }\n}\n"}])
         );
         client.shutdown();
     }

@@ -19,7 +19,8 @@ fn reports_bounded_inventory_details_when_listed_ir_sources_are_missing() {
     fs::write(root.join("iris.toml"), format!(
         "manifest_version = 1\npackage_id = \"org.example.details\"\napi_major = 1\nversion = \"1.0.0\"\niris_major = 1\nsources = {sources:?}\nentry_modules = []\n[permissions]\nrequired = []\noptional = []\n"
     )).unwrap();
-    let source = "module Main { let private_source_marker = 1; private_source_marker }";
+    let source =
+        "module Main { fun run() { let private_source_marker = 1; private_source_marker } }";
     fs::write(root.join("main.ir"), source).unwrap();
     let mut client = Client::spawn();
     client.send(
@@ -79,7 +80,7 @@ fn marks_completion_partial_when_a_listed_ir_source_is_missing() {
         &json!({"jsonrpc":"2.0","method":"workspace/didChangeWorkspaceFolders","params":{
         "event":{"added":[{"uri":uri(""),"name":"partial"}],"removed":[]}}}),
     );
-    let source = "class Box { public fun read() {} } module Main { let item = Box.new(); item.re }";
+    let source = "class Box { public fun read() {} } module Main { fun run() { let item = Box.new(); item.re } }";
     client.open(&uri("main.ir"), source);
 
     client.send(&json!({"jsonrpc":"2.0","id":2,"method":"textDocument/completion","params":{
