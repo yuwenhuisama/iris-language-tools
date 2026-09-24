@@ -39,7 +39,7 @@ fn uses_caller_utf16_range_when_target_is_in_another_file() {
     package(&root, &["main.ir", "types.iris"]);
     fs::write(
         root.join("main.ir"),
-        "module Main {\r\n '\u{1f600}'; Box.new()\r\n}",
+        "module Main { fun use() {\r\n '\u{1f600}'; Box.new()\r\n} }",
     )
     .unwrap();
     fs::write(root.join("types.iris"), "\n\n\nclass Box<T> {}").unwrap();
@@ -64,7 +64,7 @@ fn updates_known_return_when_dirty_target_changes() {
     package(&root, &["main.iris", "types.ir"]);
     fs::write(
         root.join("main.iris"),
-        "module Main { let item = Box.new(); let value = item.read(); value }",
+        "module Main { fun use() { let item = Box.new(); let value = item.read(); value } }",
     )
     .unwrap();
     fs::write(
@@ -77,10 +77,10 @@ fn updates_known_return_when_dirty_target_changes() {
     given.open(&target, "class Box { public fun read() -> Integer { 1 } }");
     let source = uri(&root.join("main.iris"));
     assert_eq!(
-        hover(&mut given, &source, (0, 61)),
+        hover(&mut given, &source, (0, 73)),
         json!({"id":2,"result":{
-            "contents":{"kind":"plaintext","value":"let value: Integer\n\nKind: Variable\n\nOwner: Main\n\nType: Integer"},
-            "range":{"start":{"line":0,"character":61},"end":{"line":0,"character":66}}
+            "contents":{"kind":"plaintext","value":"let value: Integer\n\nKind: Variable\n\nOwner: Main::use\n\nType: Integer"},
+            "range":{"start":{"line":0,"character":73},"end":{"line":0,"character":78}}
         }})
     );
     given.send(
@@ -90,13 +90,13 @@ fn updates_known_return_when_dirty_target_changes() {
     );
     assert_eq!(given.receive()["method"], "textDocument/publishDiagnostics");
 
-    let when = hover(&mut given, &source, (0, 61));
+    let when = hover(&mut given, &source, (0, 73));
 
     assert_eq!(
         when,
         json!({"id":2,"result":{
-            "contents":{"kind":"plaintext","value":"let value: String\n\nKind: Variable\n\nOwner: Main\n\nType: String"},
-            "range":{"start":{"line":0,"character":61},"end":{"line":0,"character":66}}
+            "contents":{"kind":"plaintext","value":"let value: String\n\nKind: Variable\n\nOwner: Main::use\n\nType: String"},
+            "range":{"start":{"line":0,"character":73},"end":{"line":0,"character":78}}
         }})
     );
     given.shutdown();
@@ -109,7 +109,7 @@ fn preserves_inventory_error_when_requested_source_is_missing() {
     package(&root, &["main.iris", "missing.iris"]);
     fs::write(
         root.join("main.iris"),
-        "module Main { let value = 1; value }",
+        "module Main { fun use() { let value = 1; value } }",
     )
     .unwrap();
     let mut given = client(&root);
@@ -133,18 +133,18 @@ fn returns_local_hover_when_unrelated_inventory_is_partial() {
     package(&root, &["main.iris", "missing.iris"]);
     fs::write(
         root.join("main.iris"),
-        "module Main { let value = 1; value }",
+        "module Main { fun use() { let value = 1; value } }",
     )
     .unwrap();
     let mut given = client(&root);
 
-    let when = hover(&mut given, &uri(&root.join("main.iris")), (0, 29));
+    let when = hover(&mut given, &uri(&root.join("main.iris")), (0, 41));
 
     assert_eq!(
         when,
         json!({"id":2,"result":{
-            "contents":{"kind":"plaintext","value":"let value: Integer\n\nKind: Variable\n\nOwner: Main\n\nType: Integer"},
-            "range":{"start":{"line":0,"character":29},"end":{"line":0,"character":34}}
+            "contents":{"kind":"plaintext","value":"let value: Integer\n\nKind: Variable\n\nOwner: Main::use\n\nType: Integer"},
+            "range":{"start":{"line":0,"character":41},"end":{"line":0,"character":46}}
         }})
     );
     given.shutdown();

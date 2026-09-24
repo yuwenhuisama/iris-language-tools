@@ -28,7 +28,7 @@ fn returns_plaintext_use_range_when_client_capability_is_missing() {
     given.initialize();
     given.open(
         "untitled:hover",
-        "module Main {\r\n let value = 1\r\n '\u{1f600}'; value\r\n}",
+        "module Main { fun use() {\r\n let value = 1\r\n '\u{1f600}'; value\r\n} }",
     );
 
     let when = hover(&mut given, "untitled:hover", (2, 8));
@@ -36,7 +36,7 @@ fn returns_plaintext_use_range_when_client_capability_is_missing() {
     assert_eq!(
         when,
         json!({"id":2,"result":{
-            "contents":{"kind":"plaintext","value":"let value: Integer\n\nKind: Variable\n\nOwner: Main\n\nType: Integer"},
+            "contents":{"kind":"plaintext","value":"let value: Integer\n\nKind: Variable\n\nOwner: Main::use\n\nType: Integer"},
             "range":{"start":{"line":2,"character":7},"end":{"line":2,"character":12}}
         }})
     );
@@ -47,14 +47,14 @@ fn returns_plaintext_use_range_when_client_capability_is_missing() {
 fn resolves_headers_when_hovering_source_class_and_typed_method() {
     let mut given = Client::spawn();
     given.initialize();
-    let text = "class Box { public fun read() -> Integer { 1 } }\nmodule Main { let item = Box.new(); item.read() }";
+    let text = "class Box { public fun read() -> Integer { 1 } }\nmodule Main { fun use() { let item = Box.new(); item.read() } }";
     given.open("untitled:hover", text);
     for (column, start, end, content) in [
-        (25, 25, 28, "class Box\n\nKind: Class"),
+        (37, 37, 40, "class Box\n\nKind: Class"),
         (
-            42,
-            41,
-            45,
+            54,
+            53,
+            57,
             "public fun read() -> Integer\n\nKind: Method\n\nOwner: Box\n\nDeclared return: Integer",
         ),
     ] {

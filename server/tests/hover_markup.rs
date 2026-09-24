@@ -125,14 +125,15 @@ fn renders_literal_docs_when_either_comment_form_is_attached() {
         "/**\n * First paragraph.\n *\n * ![image](https://example.test/a) <b> [run](command:run)\n */",
     ] {
         let mut given = initialized(&["markdown"]);
-        let text =
-            format!("module Main {{\n{comment}\npublic fun read() -> String {{}}\nread() }}");
+        let text = format!(
+            "module Main {{\n{comment}\npublic fun read() -> String {{}}\nfun use() {{ read() }} }}"
+        );
         given.open("untitled:hover", &text);
 
         given.send(
             &json!({"jsonrpc":"2.0","id":2,"method":"textDocument/hover","params":{
             "textDocument":{"uri":"untitled:hover"},
-            "position":{"line":text.lines().count() - 1,"character":1}}}),
+            "position":{"line":text.lines().count() - 1,"character":13}}}),
         );
         let when = given.response()["result"]["contents"].clone();
 
