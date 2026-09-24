@@ -1,9 +1,11 @@
 const assert = require('node:assert/strict');
+const { randomUUID } = require('node:crypto');
 const vscode = require('vscode');
 const { eventually, provider, position, range, coordinates, locations, location, hints, hint, replace } = require('./semantic-support.cjs');
+const { assertHover } = require('./hover-integration.cjs');
 
 exports.verifySemantics = async function () {
-  const source = "module Main { let text = '😀'; let value = 1; value; fun read(value) { value } }";
+  const source = "module Main { fun use() { let text = '😀'; let value = 1; value; } fun read(value) { value } }";
   const document = await vscode.workspace.openTextDocument({ language: 'iris', content: source });
   const editor = await vscode.window.showTextDocument(document);
   try {
@@ -30,7 +32,7 @@ exports.verifySemantics = async function () {
     assert.ok(localHints.some(value => JSON.stringify(value) === JSON.stringify(hint(source, source.indexOf('value') + 5, ': Integer'))));
     console.log('PASS: real definition, shadow-safe references, symbol completion and Integer hints with UTF-16 ranges');
 
-    const methods = 'module Main { fun read(value = 1) { 2 }; fun typed(value: Integer) -> Integer { value }; let local = 1; let explicit: Integer = 2 }';
+    const methods = 'module Main { fun read(value = 1) { 2 } fun typed(value: Integer) -> Integer { value } fun use() -> Integer { let local = 1; let explicit: Integer = 2 } }';
     await replace(editor, methods);
     await eventually('omitted versus explicit type annotations', async () => {
       assert.deepEqual(await hints(document), [
@@ -41,7 +43,7 @@ exports.verifySemantics = async function () {
     });
     console.log('PASS: omitted parameter/return stay Dynamic<Object>; explicit annotations have no redundant hints');
 
-    const members = 'class Box { public fun read() {} private fun secret() {} public class fun build() {} } module Main { let item = Box.new(); item.re }';
+    const members = 'class Box { public fun read() {} private fun secret() {} public class fun build() {} } module Main { fun use() { let item = Box.new(); item.re } }';
     await replace(editor, members);
     await eventually('known instance member completion', async () => {
       const result = await provider('CompletionItem', document, position(members, members.lastIndexOf('re }') + 2));
@@ -49,19 +51,47 @@ exports.verifySemantics = async function () {
       assert.equal(result.items[0].kind, vscode.CompletionItemKind.Method);
       assert.deepEqual(coordinates(result.items[0].range), coordinates(range(members, 're', members.lastIndexOf('re }'))));
     });
-    const trailing = members.slice(0, members.lastIndexOf('re }'));
+    const trailing = `${members.slice(0, members.lastIndexOf('re }'))} } }`;
     await replace(editor, trailing);
     await eventually('trailing-dot completion during incomplete edit', async () => {
-      const result = await provider('CompletionItem', document, position(trailing, trailing.length));
+      const result = await provider('CompletionItem', document, position(trailing, trailing.length - 4));
       assert.equal(result.isIncomplete, true);
       assert.deepEqual(result.items.map(item => item.label), ['read']);
-      assert.deepEqual(coordinates(result.items[0].range), coordinates(range(trailing, '', trailing.length)));
+      assert.deepEqual(coordinates(result.items[0].range), coordinates(range(trailing, '', trailing.length - 4)));
     });
     assert.equal(document.isDirty, true);
     console.log('PASS: known instance completion excludes private/class members and survives an unsaved trailing dot');
   } finally {
     await vscode.window.showTextDocument(document);
     await vscode.commands.executeCommand('workbench.action.revertAndCloseActiveEditor');
+  }
+
+  for (const suffix of ['.iris', '.ir']) {
+    const uri = vscode.Uri.parse(`untitled:semantic-${randomUUID()}${suffix}`);
+    const chain = "class Box { public fun next() -> Box? { nil } public fun name() -> String { 'x' } }\n"
+      + "module Main { fun use() { let box = Box.new(); let parts = box.next()?.name()?.split(''); let sections = 'ffff'.split(''); let lines = sections[0]?.split('\\n'); let definite = sections[0]!.split('\\n'); } }";
+    const chainDocument = await vscode.workspace.openTextDocument(uri);
+    const chainEditor = await vscode.window.showTextDocument(chainDocument);
+    try {
+      assert.equal(chainDocument.languageId, 'iris');
+      await replace(chainEditor, chain);
+      await eventually(`${suffix} optional and non-null split inference`, async () => {
+        await assertHover(chainDocument, range(chain, 'parts'), [/\bArray<String>\?/]);
+        await assertHover(chainDocument, range(chain, 'lines'), [/\bArray<String>\?/]);
+        await assertHover(chainDocument, range(chain, 'definite'), [/\bArray<String>(?:\b|$)/]);
+        const actual = await hints(chainDocument);
+        for (const expected of [
+          hint(chain, chain.indexOf('parts') + 5, ': Array<String>?'),
+          hint(chain, chain.indexOf('lines') + 5, ': Array<String>?'),
+          hint(chain, chain.indexOf('definite') + 8, ': Array<String>'),
+        ]) assert.ok(actual.some(value => JSON.stringify(value) === JSON.stringify(expected)),
+          `Missing chain type hint ${JSON.stringify(expected)}; got ${JSON.stringify(actual)}`);
+      });
+      console.log(`PASS: ${suffix} source-class and indexed optional chains preserve nullable Array<String>; non-null assertion infers Array<String> Hover and hints`);
+    } finally {
+      await vscode.window.showTextDocument(chainDocument);
+      await vscode.commands.executeCommand('workbench.action.revertAndCloseActiveEditor');
+    }
   }
   if (process.env.IRIS_TEST_EMPTY !== '1') await require('./semantic-workspace.cjs').verifyWorkspace();
 };
