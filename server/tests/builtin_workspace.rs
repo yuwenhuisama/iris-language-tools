@@ -17,7 +17,7 @@ fn query(client: &mut Client, method: &str, params: &Value) -> Value {
 
 #[test]
 fn prefers_source_signature_when_string_is_declared_locally() {
-    let text = "class String { public fun replace(source_value: Integer) -> Bool { true } }\nmodule Main { let text = String.new(); text.replace(1) }";
+    let text = "class String { public fun replace(source_value: Integer) -> Bool { true } }\nmodule Main { fun use() { let text = String.new(); text.replace(1) } }";
     let mut given = Client::spawn();
     given.initialize();
     given.open("untitled:shadow", text);
@@ -42,7 +42,7 @@ fn prefers_source_signature_when_string_is_declared_locally() {
 
 #[test]
 fn excludes_builtin_members_when_source_string_is_declared_locally() {
-    let text = "class String { public fun source_only() {} }\nmodule Main { let text = String.new(); text. }";
+    let text = "class String { public fun source_only() {} }\nmodule Main { fun use() { let text = String.new(); text. } }";
     let mut given = Client::spawn();
     given.initialize();
     given.open("untitled:shadow", text);
@@ -73,7 +73,7 @@ fn refreshes_source_shadow_when_same_package_overlay_changes() {
     fs::write(root.join("iris.toml"),
         "manifest_version = 1\npackage_id = \"org.example.builtins\"\napi_major = 1\nversion = \"1.0.0\"\niris_major = 1\nsources = [\"main.ir\", \"types.iris\"]\nentry_modules = []\n[permissions]\nrequired = []\noptional = []\n"
     ).unwrap();
-    let caller = "module Main { let text: String = 'abc'; text.replace(1) }";
+    let caller = "module Main { fun use() { let text: String = 'abc'; text.replace(1) } }";
     let original = "class String { public fun replace(disk_value: Integer) -> Integer {} }";
     fs::write(root.join("main.ir"), caller).unwrap();
     fs::write(root.join("types.iris"), original).unwrap();

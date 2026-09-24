@@ -209,14 +209,14 @@ fn expands_methods_semicolons_else_and_lists_when_official_style_is_requested() 
     client.initialize();
     client.open(
         URI,
-        "fun f(){let values=[\n1,\n2\n];if ready {print(values);}else{print(0);}}",
+        "fun f(){let values=%[\n1,\n2\n];if ready {print(values);}else{print(0);}}",
     );
 
     let response = request(&mut client, json!({"tabSize":8,"insertSpaces":false}));
 
     assert_eq!(
         response["result"][0]["newText"],
-        "fun f() {\n  let values = [\n    1,\n    2,\n  ]\n  if ready {\n    print(values)\n  }\n  else {\n    print(0)\n  }\n}\n"
+        "fun f() {\n  let values = %[\n    1,\n    2,\n  ]\n  if ready {\n    print(values)\n  }\n  else {\n    print(0)\n  }\n}\n"
     );
     client.shutdown();
 }
