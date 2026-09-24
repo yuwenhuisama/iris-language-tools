@@ -114,7 +114,17 @@ String `split`, `chars`, `to_array`, and text `graphemes` preserve structural
 `Array<String>` facts. Integer indexing yields `String?` (including out-of-bounds
 nil), while Range indexing retains the array type. Immutable copies and explicit
 `Array<Builtin>` annotations preserve element facts without parsing display labels.
-Nullable elements do not expose definite String completions. Element inference
+Nullable elements do not expose definite String completions through ordinary `.`.
+Within a parser-recorded `?.` postfix chain, known source-class and builtin
+members resolve against the non-nil receiver; subsequent calls, members, and
+indices retain a single nullable result. For example, `sections[0]?.split("\n")`
+has type `Array<String>?` when the split result and array contents remain known.
+Grouping ends the guard, and another ordinary `.` on a nullable binding is not
+treated as safe. Postfix `!` narrows only its expression result, not the source
+binding. Explicit simple `T?` annotations for known source classes, builtins,
+and `Array<Builtin>` preserve their inner receiver facts. Unknown, Dynamic,
+ambiguous, generic, or mutated surfaces still do not acquire inferred members.
+Element inference
 refuses unknown/Dynamic elements or indexes, shadowed annotations, reopened Array
 or producer families, and incomplete inventory. A bounded same-file use scan
 refuses mutations, member calls, escapes, constant exposure, mutable aliases, and captures; it is not
