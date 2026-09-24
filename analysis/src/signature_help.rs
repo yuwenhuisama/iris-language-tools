@@ -115,6 +115,9 @@ fn builtin_parameter(call: &CallSite, byte: usize, shape: &CallShape) -> Option<
                 .iter()
                 .position(|parameter| parameter.kind == ParameterKind::Block)
                 .or_else(position),
+            ArgumentKind::PositionalSpread | ArgumentKind::KeywordSpread | ArgumentKind::Block => {
+                return None;
+            }
         }?;
         if supplied[mapped] && shape.parameters[mapped].kind != ParameterKind::Rest {
             return None;
@@ -211,6 +214,9 @@ fn active_parameter(
                     index
                 })
             }
+            Some(
+                ArgumentKind::PositionalSpread | ArgumentKind::KeywordSpread | ArgumentKind::Block,
+            ) => return None,
         }?;
         if index == active {
             return Some(ActiveParameter::Mapped(mapped));

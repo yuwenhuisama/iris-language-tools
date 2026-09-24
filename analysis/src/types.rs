@@ -5,7 +5,7 @@ use iris_syntax::TypeExpression;
 #[derive(Clone, Debug)]
 pub enum TypeFact {
     ArrayOf(iris_builtins::BuiltinType),
-    Nullable(iris_builtins::BuiltinType),
+    Nullable(Box<Self>),
     BuiltinClass(&'static str),
     Builtin {
         kind: iris_builtins::BuiltinType,
@@ -19,6 +19,22 @@ pub enum TypeFact {
     Object(Key),
 }
 
+impl TypeFact {
+    pub(crate) fn nullable(self) -> Self {
+        match self {
+            Self::Nullable(_) | Self::Literal("Nil") => self,
+            fact => Self::Nullable(Box::new(fact)),
+        }
+    }
+
+    pub(crate) fn non_null(self) -> Self {
+        match self {
+            Self::Nullable(fact) => *fact,
+            fact => fact,
+        }
+    }
+}
+
 impl AnalysisSnapshot {
     pub(crate) fn annotation_type(&self, key: Key) -> Option<TypeFact> {
         let document = &self.documents[&key.file];
@@ -26,6 +42,26 @@ impl AnalysisSnapshot {
         let SourceKind::Type(annotation) = &node.kind else {
             return None;
         };
+        self.annotation_fact(key, annotation)
+    }
+
+    fn annotation_fact(&self, key: Key, annotation: &TypeExpression) -> Option<TypeFact> {
+        let document = &self.documents[&key.file];
+        let node = document.source.node(key.node);
+        if let TypeExpression::Union(members) = annotation
+            && let [inner, TypeExpression::Name(nil)] = members.as_slice()
+            && nil == "Nil"
+        {
+            let fact = self.annotation_fact(key, inner)?;
+            return Some(match fact {
+                TypeFact::Written { .. } => TypeFact::Written {
+                    label: document.input.text[node.span.start..node.span.end]
+                        .trim()
+                        .to_owned(),
+                },
+                fact => fact.nullable(),
+            });
+        }
         if let Some(element) = self.array_annotation_element(key, annotation) {
             return Some(TypeFact::ArrayOf(element));
         }
@@ -64,9 +100,19 @@ impl AnalysisSnapshot {
             | TypeExpression::Union(_)
             | TypeExpression::Function { .. } => {}
         }
-        let label = document.input.text[node.span.start..node.span.end]
-            .trim()
-            .to_owned();
+        let label = if matches!(
+            annotation,
+            TypeExpression::Name(_) | TypeExpression::Generic { .. }
+        ) {
+            document.input.text[node.span.start..node.span.end]
+                .trim()
+                .trim_end_matches('?')
+                .to_owned()
+        } else {
+            document.input.text[node.span.start..node.span.end]
+                .trim()
+                .to_owned()
+        };
         let name = match annotation {
             TypeExpression::Name(name) | TypeExpression::Generic { name, .. } => Some(name),
             TypeExpression::Typeof(_)
@@ -92,31 +138,25 @@ impl AnalysisSnapshot {
             return None;
         };
         match expression {
-            ExpressionFact::Index { receiver, index } => {
-                self.array_index_type(key, (*receiver, *index), depth + 1)
-            }
+            ExpressionFact::Index { receiver, index } => self
+                .array_index_type(key, (*receiver, *index), depth + 1)
+                .map(|fact| {
+                    if self.guarded_chain(Key {
+                        node: *receiver,
+                        ..key
+                    }) {
+                        fact.nullable()
+                    } else {
+                        fact
+                    }
+                }),
             ExpressionFact::Array { .. } => Some(TypeFact::Literal("Array")),
             ExpressionFact::Tuple { .. } => Some(TypeFact::Literal("Tuple")),
             ExpressionFact::Hash { .. } => Some(TypeFact::Literal("Hash")),
             ExpressionFact::Range { .. } => Some(TypeFact::Literal("Range")),
-            ExpressionFact::Literal { text, kind } => Some(TypeFact::Literal(match kind {
-                LiteralKind::Integer => "Integer",
-                LiteralKind::Float => {
-                    if text.ends_with("f32") {
-                        "Float32"
-                    } else {
-                        "Float64"
-                    }
-                }
-                LiteralKind::String => "String",
-                LiteralKind::MutableString => "MutableString",
-                LiteralKind::Bytes => "Bytes",
-                LiteralKind::ByteArray => "ByteArray",
-                LiteralKind::Regex => "Regex",
-                LiteralKind::Symbol => "Symbol",
-                LiteralKind::Bool => "Bool",
-                LiteralKind::Nil => "Nil",
-            })),
+            ExpressionFact::Literal { text, kind } => {
+                Some(TypeFact::Literal(Self::literal_name(text, *kind)))
+            }
             ExpressionFact::Name { path } => {
                 if path.len() == 1 && path[0].text == "self" {
                     let receiver = self.self_receiver(self.node_cursor(key))?;
@@ -141,10 +181,24 @@ impl AnalysisSnapshot {
                 },
                 depth + 1,
             ),
-            ExpressionFact::Member { .. } => self.expression_symbol(key, depth + 1).map_or_else(
-                || self.builtin_result(key, depth + 1),
-                |target| self.binding_type(target, depth + 1),
+            ExpressionFact::Member { receiver, .. } => self.member_type(
+                key,
+                depth,
+                self.guarded_chain(Key {
+                    node: *receiver,
+                    ..key
+                }),
             ),
+            ExpressionFact::SafeNavigation { .. } => self.member_type(key, depth, true),
+            ExpressionFact::NonNull { value } => self
+                .expression_type(
+                    Key {
+                        node: *value,
+                        ..key
+                    },
+                    depth + 1,
+                )
+                .map(TypeFact::non_null),
             ExpressionFact::Call {
                 callee,
                 type_arguments,
@@ -153,15 +207,22 @@ impl AnalysisSnapshot {
                 if !type_arguments.is_empty() {
                     return None;
                 }
-                self.call_type(
-                    Key {
-                        file: key.file,
-                        node: *callee,
-                    },
-                    depth,
-                )
+                let callee = Key {
+                    file: key.file,
+                    node: *callee,
+                };
+                self.call_type(callee, depth).map(|fact| {
+                    if self.guarded_chain(callee) {
+                        fact.nullable()
+                    } else {
+                        fact
+                    }
+                })
             }
             ExpressionFact::IncompleteMember { .. }
+            | ExpressionFact::PositionalSpread { .. }
+            | ExpressionFact::KeywordSpread { .. }
+            | ExpressionFact::BlockArgument { .. }
             | ExpressionFact::Closure { .. }
             | ExpressionFact::Assignment { .. }
             | ExpressionFact::Construction { .. }
@@ -169,6 +230,50 @@ impl AnalysisSnapshot {
             | ExpressionFact::KeywordArgument { .. }
             | ExpressionFact::Unsupported { .. } => None,
         }
+    }
+
+    fn literal_name(text: &str, kind: LiteralKind) -> &'static str {
+        match kind {
+            LiteralKind::Integer => "Integer",
+            LiteralKind::Float if text.ends_with("f32") => "Float32",
+            LiteralKind::Float => "Float64",
+            LiteralKind::String => "String",
+            LiteralKind::MutableString => "MutableString",
+            LiteralKind::Bytes => "Bytes",
+            LiteralKind::ByteArray => "ByteArray",
+            LiteralKind::Regex => "Regex",
+            LiteralKind::Symbol => "Symbol",
+            LiteralKind::Bool => "Bool",
+            LiteralKind::Nil => "Nil",
+        }
+    }
+
+    fn member_type(&self, key: Key, depth: usize, guarded: bool) -> Option<TypeFact> {
+        let fact = self.expression_symbol(key, depth + 1).map_or_else(
+            || self.builtin_result(key, depth + 1),
+            |target| self.binding_type(target, depth + 1),
+        )?;
+        Some(if guarded { fact.nullable() } else { fact })
+    }
+
+    pub(crate) fn guarded_chain(&self, key: Key) -> bool {
+        let mut node = key.node;
+        for _ in 0..64 {
+            match &self.documents[&key.file].source.node(node).kind {
+                SourceKind::Expression(ExpressionFact::SafeNavigation { .. }) => return true,
+                SourceKind::Expression(
+                    ExpressionFact::Member {
+                        receiver,
+                        contract: false,
+                        ..
+                    }
+                    | ExpressionFact::Index { receiver, .. },
+                ) => node = *receiver,
+                SourceKind::Expression(ExpressionFact::Call { callee, .. }) => node = *callee,
+                _ => return false,
+            }
+        }
+        false
     }
 
     fn call_type(&self, callee_key: Key, depth: usize) -> Option<TypeFact> {
@@ -224,7 +329,7 @@ impl AnalysisSnapshot {
     pub(crate) fn type_label(&self, fact: TypeFact) -> Option<String> {
         match fact {
             TypeFact::ArrayOf(element) => Some(element.array_name().to_owned()),
-            TypeFact::Nullable(element) => Some(format!("{}?", element.name())),
+            TypeFact::Nullable(inner) => Some(format!("{}?", self.type_label(*inner)?)),
             TypeFact::Literal(label) => Some(label.to_owned()),
             TypeFact::Written { label } | TypeFact::Builtin { label, .. } => Some(label),
             TypeFact::Instance(key) => Some(self.symbol(key)?.qualified.as_ref()?.join("::")),

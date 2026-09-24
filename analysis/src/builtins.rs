@@ -30,11 +30,14 @@ impl AnalysisSnapshot {
                     member.surface == Surface::Global && member.selector == path[0].text
                 })
             }
-            SourceKind::Expression(ExpressionFact::Member {
-                receiver,
-                name,
-                contract: false,
-            }) => {
+            SourceKind::Expression(
+                ExpressionFact::Member {
+                    receiver,
+                    name,
+                    contract: false,
+                }
+                | ExpressionFact::SafeNavigation { receiver, name },
+            ) => {
                 let receiver_key = Key {
                     node: *receiver,
                     ..key
@@ -42,7 +45,19 @@ impl AnalysisSnapshot {
                 if !self.builtin_selector_available(receiver_key, &name.text) {
                     return None;
                 }
-                let receiver = self.builtin_receiver(receiver_key, depth + 1)?;
+                let receiver = if matches!(
+                    &node.kind,
+                    SourceKind::Expression(ExpressionFact::SafeNavigation { .. })
+                ) || self.guarded_chain(receiver_key)
+                {
+                    self.builtin_receiver_fact(
+                        receiver_key,
+                        &self.expression_type(receiver_key, depth + 1)?.non_null(),
+                        depth + 1,
+                    )?
+                } else {
+                    self.builtin_receiver(receiver_key, depth + 1)?
+                };
                 let called = self.builtin_is_called(key);
                 receiver
                     .members()

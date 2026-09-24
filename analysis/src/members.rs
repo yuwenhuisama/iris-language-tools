@@ -14,13 +14,18 @@ pub struct Receiver {
 
 impl AnalysisSnapshot {
     pub(crate) fn receiver(&self, key: Key, depth: usize) -> Option<Receiver> {
-        match self.expression_type(key, depth + 1)? {
+        let fact = self.expression_type(key, depth + 1)?;
+        self.source_receiver(&fact)
+    }
+
+    pub(crate) fn source_receiver(&self, fact: &TypeFact) -> Option<Receiver> {
+        match fact {
             TypeFact::Instance(owner) => Some(Receiver {
-                owner,
+                owner: *owner,
                 surface: MethodKind::Instance,
             }),
             TypeFact::Object(owner) => {
-                let surface = match self.symbol(owner)?.declaration.kind {
+                let surface = match self.symbol(*owner)?.declaration.kind {
                     DeclarationKind::Class => MethodKind::Class,
                     DeclarationKind::Module => MethodKind::Module,
                     DeclarationKind::Contract
@@ -35,7 +40,10 @@ impl AnalysisSnapshot {
                     | DeclarationKind::TypeParameter
                     | DeclarationKind::PatternBinding => return None,
                 };
-                Some(Receiver { owner, surface })
+                Some(Receiver {
+                    owner: *owner,
+                    surface,
+                })
             }
             TypeFact::Written { .. }
             | TypeFact::ArrayOf(_)
@@ -67,21 +75,29 @@ impl AnalysisSnapshot {
                     self.implicit_method(cursor, &path[0].text)
                 })
             }
-            SourceKind::Expression(ExpressionFact::Member {
-                receiver,
-                name,
-                contract,
-            }) => {
-                if *contract {
-                    return None;
+            SourceKind::Expression(
+                ExpressionFact::Member {
+                    receiver,
+                    name,
+                    contract: false,
                 }
-                let receiver = self.receiver(
-                    Key {
-                        file: key.file,
-                        node: *receiver,
-                    },
-                    depth + 1,
-                )?;
+                | ExpressionFact::SafeNavigation { receiver, name },
+            ) => {
+                let receiver_key = Key {
+                    file: key.file,
+                    node: *receiver,
+                };
+                let receiver = if matches!(
+                    &node.kind,
+                    SourceKind::Expression(ExpressionFact::SafeNavigation { .. })
+                ) || self.guarded_chain(receiver_key)
+                {
+                    self.source_receiver(
+                        &self.expression_type(receiver_key, depth + 1)?.non_null(),
+                    )?
+                } else {
+                    self.receiver(receiver_key, depth + 1)?
+                };
                 self.member(cursor, receiver, &name.text)
             }
             SourceKind::Expression(ExpressionFact::Grouped { value }) => self.expression_symbol(

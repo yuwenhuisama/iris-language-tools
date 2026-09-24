@@ -32,7 +32,12 @@ impl AnalysisSnapshot {
             node: children.0,
             ..key
         };
-        let TypeFact::ArrayOf(element) = self.expression_type(receiver, depth)? else {
+        let fact = self.expression_type(receiver, depth)?;
+        let TypeFact::ArrayOf(element) = (if self.guarded_chain(receiver) {
+            fact.non_null()
+        } else {
+            fact
+        }) else {
             return None;
         };
         let array_member = iris_builtins::members()
@@ -54,7 +59,13 @@ impl AnalysisSnapshot {
             | TypeFact::Builtin {
                 kind: BuiltinType::Integer,
                 ..
-            } => Some(TypeFact::Nullable(element)),
+            } => Some(
+                TypeFact::Builtin {
+                    kind: element,
+                    label: element.name().to_owned(),
+                }
+                .nullable(),
+            ),
             TypeFact::Literal("Range")
             | TypeFact::Builtin {
                 kind: BuiltinType::Range,
@@ -142,7 +153,37 @@ impl AnalysisSnapshot {
                     {
                         child = parent;
                     }
-                    SourceKind::Expression(ExpressionFact::IncompleteMember { .. }) => return true,
+                    SourceKind::Expression(ExpressionFact::SafeNavigation { receiver, .. })
+                        if *receiver == child =>
+                    {
+                        return matches!(
+                            document.source.node(child).kind,
+                            SourceKind::Expression(ExpressionFact::Index { .. })
+                        );
+                    }
+                    SourceKind::Expression(ExpressionFact::NonNull { value })
+                        if *value == child =>
+                    {
+                        child = parent;
+                    }
+                    SourceKind::Expression(ExpressionFact::Member { receiver, .. })
+                        if *receiver == child
+                            && matches!(
+                                document.source.node(child).kind,
+                                SourceKind::Expression(ExpressionFact::NonNull { value })
+                                    if matches!(
+                                        document.source.node(value).kind,
+                                        SourceKind::Expression(ExpressionFact::Index { .. })
+                                    )
+                            ) =>
+                    {
+                        return true;
+                    }
+                    SourceKind::Expression(ExpressionFact::IncompleteMember {
+                        receiver, ..
+                    }) if *receiver == child => {
+                        return true;
+                    }
                     _ => return false,
                 }
             }

@@ -28,29 +28,18 @@ impl AnalysisSnapshot {
         let mut keys = Vec::new();
         let receivers = document.completion_receivers(byte);
         let mut member_context = !receivers.is_empty();
-        for receiver in receivers {
-            if let Some(receiver) = receiver {
+        for (receiver, guarded) in receivers {
+            let receiver_key = receiver.map(|node| Key { file, node });
+            if let Some(receiver) = receiver_key {
                 result.items.extend(
-                    self.builtin_member_completions(
-                        Key {
-                            file,
-                            node: receiver,
-                        },
-                        replace,
-                    )
-                    .into_iter()
-                    .filter(|item| item.label.starts_with(prefix)),
+                    self.builtin_member_completions(receiver, replace, guarded)
+                        .into_iter()
+                        .filter(|item| item.label.starts_with(prefix)),
                 );
             }
-            if let Some(receiver) = receiver.and_then(|receiver| {
-                self.receiver(
-                    Key {
-                        file,
-                        node: receiver,
-                    },
-                    0,
-                )
-            }) {
+            if let Some(receiver) =
+                receiver_key.and_then(|key| self.completion_source_receiver(key, guarded))
+            {
                 keys.extend(
                     self.member_candidates(cursor, receiver)
                         .into_iter()
@@ -109,6 +98,19 @@ impl AnalysisSnapshot {
         result
     }
 
+    fn completion_source_receiver(
+        &self,
+        key: Key,
+        guarded: bool,
+    ) -> Option<crate::members::Receiver> {
+        if guarded {
+            self.expression_type(key, 0)
+                .and_then(|fact| self.source_receiver(&fact.non_null()))
+        } else {
+            self.receiver(key, 0)
+        }
+    }
+
     fn completion_labels(&self, file: FileId) -> BTreeSet<String> {
         let mut labels: BTreeSet<_> = self
             .symbols
@@ -165,7 +167,10 @@ impl crate::Document {
                 .iter()
                 .any(|region| region.code.starts_with("LEX_"))
     }
-    fn completion_receivers(&self, byte: usize) -> Vec<Option<iris_parser::source::SyntaxId>> {
+    fn completion_receivers(
+        &self,
+        byte: usize,
+    ) -> Vec<(Option<iris_parser::source::SyntaxId>, bool)> {
         self.source
             .nodes
             .iter()
@@ -175,12 +180,17 @@ impl crate::Document {
                     name,
                     contract,
                 }) if name.span.start <= byte && byte <= name.span.end => {
-                    Some((!*contract).then_some(*receiver))
+                    Some(((!*contract).then_some(*receiver), false))
+                }
+                SourceKind::Expression(ExpressionFact::SafeNavigation { receiver, name })
+                    if name.span.start <= byte && byte <= name.span.end =>
+                {
+                    Some((Some(*receiver), true))
                 }
                 SourceKind::Expression(ExpressionFact::IncompleteMember { receiver, dot })
                     if dot.end <= byte && self.input.text[dot.end..byte].trim().is_empty() =>
                 {
-                    Some(Some(*receiver))
+                    Some((Some(*receiver), false))
                 }
                 _ => None,
             })
@@ -192,11 +202,10 @@ impl crate::Document {
             .nodes
             .iter()
             .find_map(|node| match &node.kind {
-                SourceKind::Expression(ExpressionFact::Member { name, .. })
-                    if name.span.start <= byte && byte <= name.span.end =>
-                {
-                    Some(name.span)
-                }
+                SourceKind::Expression(
+                    ExpressionFact::Member { name, .. }
+                    | ExpressionFact::SafeNavigation { name, .. },
+                ) if name.span.start <= byte && byte <= name.span.end => Some(name.span),
                 _ => None,
             })
             .or_else(|| {

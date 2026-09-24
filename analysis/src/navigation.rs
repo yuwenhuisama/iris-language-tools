@@ -85,35 +85,15 @@ impl AnalysisSnapshot {
                         sites.push((path[0].span, target, false));
                     }
                 }
-                SourceKind::Expression(ExpressionFact::Member { name, .. }) => {
+                SourceKind::Expression(
+                    ExpressionFact::Member { name, .. }
+                    | ExpressionFact::SafeNavigation { name, .. },
+                ) => {
                     if let Some(target) = self.expression_symbol(key, 0) {
                         sites.push((name.span, target, false));
                     }
                 }
-                SourceKind::Type(_) => {
-                    let names: Vec<NameSite> = node
-                        .children
-                        .iter()
-                        .filter_map(|child| match &document.source.node(*child).kind {
-                            SourceKind::Name(site) => Some(site.clone()),
-                            _ => None,
-                        })
-                        .collect();
-                    for (index, site) in names.iter().enumerate() {
-                        let start = (0..index)
-                            .rev()
-                            .find(|previous| {
-                                document.input.text
-                                    [names[*previous].span.end..names[*previous + 1].span.start]
-                                    .trim()
-                                    != "::"
-                            })
-                            .map_or(0, |previous| previous + 1);
-                        if let Some(target) = self.path(cursor, &names[start..=index]) {
-                            sites.push((site.span, target, false));
-                        }
-                    }
-                }
+                SourceKind::Type(_) => self.type_occurrences(key, &mut sites),
                 SourceKind::Import(import) => {
                     if import.separators.iter().any(|separator| {
                         separator.kind == iris_parser::source::ImportSeparatorKind::Dot
@@ -153,5 +133,31 @@ impl AnalysisSnapshot {
         sites.sort_by_key(|(span, _, declaration)| (span.start, span.end, *declaration));
         sites.dedup();
         sites
+    }
+
+    fn type_occurrences(&self, key: Key, sites: &mut Vec<(Span, Key, bool)>) {
+        let document = &self.documents[&key.file];
+        let node = document.source.node(key.node);
+        let names: Vec<NameSite> = node
+            .children
+            .iter()
+            .filter_map(|child| match &document.source.node(*child).kind {
+                SourceKind::Name(site) => Some(site.clone()),
+                _ => None,
+            })
+            .collect();
+        for (index, site) in names.iter().enumerate() {
+            let start = (0..index)
+                .rev()
+                .find(|previous| {
+                    document.input.text[names[*previous].span.end..names[*previous + 1].span.start]
+                        .trim()
+                        != "::"
+                })
+                .map_or(0, |previous| previous + 1);
+            if let Some(target) = self.path(self.node_cursor(key), &names[start..=index]) {
+                sites.push((site.span, target, false));
+            }
+        }
     }
 }

@@ -82,7 +82,10 @@ impl AnalysisSnapshot {
         let document = &self.documents[&file];
         for node in &document.source.nodes {
             let site = match &node.kind {
-                SourceKind::Expression(ExpressionFact::Member { name, .. }) => Some(name),
+                SourceKind::Expression(
+                    ExpressionFact::Member { name, .. }
+                    | ExpressionFact::SafeNavigation { name, .. },
+                ) => Some(name),
                 SourceKind::Expression(ExpressionFact::Name { path }) => path.last(),
                 _ => None,
             };
@@ -153,31 +156,37 @@ impl AnalysisSnapshot {
                     docs,
                 });
             }
-            if let Some(super::BuiltinReceiver::Named { owner, surface }) =
-                self.builtin_receiver(key, 0)
-            {
-                return Some(HoverInfo {
-                    span: site.span,
-                    signature: format!(
-                        "builtin {} {owner}",
-                        if surface == Surface::Class {
-                            "class"
-                        } else {
-                            "service"
-                        }
-                    ),
-                    type_label: None,
-                    kind: if surface == Surface::Class {
-                        HoverKind::Class
-                    } else {
-                        HoverKind::Module
-                    },
-                    owner: None,
-                    details: Vec::new(),
-                    docs: None,
-                });
+            if let Some(info) = self.builtin_named_hover(key, site.span) {
+                return Some(info);
             }
         }
         None
+    }
+
+    fn builtin_named_hover(&self, key: Key, span: Span) -> Option<HoverInfo> {
+        let super::BuiltinReceiver::Named { owner, surface } = self.builtin_receiver(key, 0)?
+        else {
+            return None;
+        };
+        Some(HoverInfo {
+            span,
+            signature: format!(
+                "builtin {} {owner}",
+                if surface == Surface::Class {
+                    "class"
+                } else {
+                    "service"
+                }
+            ),
+            type_label: None,
+            kind: if surface == Surface::Class {
+                HoverKind::Class
+            } else {
+                HoverKind::Module
+            },
+            owner: None,
+            details: Vec::new(),
+            docs: None,
+        })
     }
 }

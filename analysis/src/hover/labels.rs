@@ -95,7 +95,13 @@ impl AnalysisSnapshot {
             ExpressionFact::Name { path } => {
                 self.hover_label(self.path(self.node_cursor(key), path)?, depth + 1)
             }
+            ExpressionFact::SafeNavigation { .. } | ExpressionFact::NonNull { .. } => {
+                self.type_label(self.expression_type(key, depth)?)
+            }
             ExpressionFact::Member { .. } => {
+                if self.guarded_chain(key) {
+                    return self.type_label(self.expression_type(key, depth)?);
+                }
                 let target = self.expression_symbol(key, depth + 1)?;
                 if self.symbol(target)?.declaration.kind == DeclarationKind::Method {
                     return None;
@@ -117,6 +123,9 @@ impl AnalysisSnapshot {
                 if !type_arguments.is_empty() {
                     return None;
                 }
+                if self.guarded_chain(key) {
+                    return self.type_label(self.expression_type(key, depth)?);
+                }
                 self.hover_call(
                     Key {
                         node: *callee,
@@ -132,6 +141,9 @@ impl AnalysisSnapshot {
             | ExpressionFact::Hash { .. }
             | ExpressionFact::Range { .. } => self.type_label(self.expression_type(key, depth)?),
             ExpressionFact::IncompleteMember { .. }
+            | ExpressionFact::PositionalSpread { .. }
+            | ExpressionFact::KeywordSpread { .. }
+            | ExpressionFact::BlockArgument { .. }
             | ExpressionFact::Assignment { .. }
             | ExpressionFact::Construction { .. }
             | ExpressionFact::ReifiedType { .. }

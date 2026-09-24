@@ -10,28 +10,34 @@ impl AnalysisSnapshot {
         &self,
         receiver: Key,
         replace: Span,
+        guarded: bool,
     ) -> Vec<CompletionItem> {
-        self.builtin_receiver(receiver, 0)
-            .into_iter()
-            .flat_map(super::BuiltinReceiver::members)
-            .filter(|member| self.builtin_unchanged(receiver.file, member))
-            .filter(|member| self.builtin_selector_available(receiver, member.selector))
-            .map(|member| CompletionItem {
-                label: member.selector.into(),
-                detail: member
-                    .shapes
-                    .first()
-                    .and_then(|shape| super::presentation::signature(member, shape))
-                    .map(|info| info.label)
-                    .or_else(|| Some(format!("builtin {}.{}", member.owner, member.selector))),
-                kind: if member.surface == Surface::Property {
-                    CompletionKind::Property
-                } else {
-                    CompletionKind::Method
-                },
-                replace,
-            })
-            .collect()
+        (if guarded {
+            self.expression_type(receiver, 0)
+                .and_then(|fact| self.builtin_receiver_fact(receiver, &fact.non_null(), 0))
+        } else {
+            self.builtin_receiver(receiver, 0)
+        })
+        .into_iter()
+        .flat_map(super::BuiltinReceiver::members)
+        .filter(|member| self.builtin_unchanged(receiver.file, member))
+        .filter(|member| self.builtin_selector_available(receiver, member.selector))
+        .map(|member| CompletionItem {
+            label: member.selector.into(),
+            detail: member
+                .shapes
+                .first()
+                .and_then(|shape| super::presentation::signature(member, shape))
+                .map(|info| info.label)
+                .or_else(|| Some(format!("builtin {}.{}", member.owner, member.selector))),
+            kind: if member.surface == Surface::Property {
+                CompletionKind::Property
+            } else {
+                CompletionKind::Method
+            },
+            replace,
+        })
+        .collect()
     }
 
     pub(crate) fn builtin_name_completions(

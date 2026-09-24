@@ -76,15 +76,6 @@ impl AnalysisSnapshot {
         if let SourceKind::Expression(ExpressionFact::Closure { .. }) = &node.kind {
             return Some(BuiltinReceiver::Instance(BuiltinType::Closure));
         }
-        if let SourceKind::Expression(ExpressionFact::Grouped { value }) = &node.kind {
-            return self.builtin_receiver(
-                Key {
-                    node: *value,
-                    ..key
-                },
-                depth + 1,
-            );
-        }
         if let SourceKind::Expression(ExpressionFact::Name { path }) = &node.kind
             && let Some(binding) = self.path(self.node_cursor(key), path)
             && let Some(symbol) = self.symbol(binding)
@@ -117,21 +108,36 @@ impl AnalysisSnapshot {
                 });
             }
         }
-        match self.expression_type(key, depth + 1)? {
+        let fact = self.expression_type(key, depth + 1)?;
+        let fact = if self.guarded_chain(key) {
+            fact.non_null()
+        } else {
+            fact
+        };
+        self.builtin_receiver_fact(key, &fact, depth)
+    }
+
+    pub(crate) fn builtin_receiver_fact(
+        &self,
+        key: Key,
+        fact: &TypeFact,
+        depth: usize,
+    ) -> Option<BuiltinReceiver> {
+        match fact {
             TypeFact::ArrayOf(_) => Some(BuiltinReceiver::Instance(BuiltinType::Array)),
             TypeFact::Literal(name) => BuiltinType::from_name(name).map(BuiltinReceiver::Instance),
-            TypeFact::Builtin { kind, .. } => Some(BuiltinReceiver::Instance(kind)),
+            TypeFact::Builtin { kind, .. } => Some(BuiltinReceiver::Instance(*kind)),
             TypeFact::BuiltinClass(owner) => Some(BuiltinReceiver::Named {
                 owner,
                 surface: Surface::Class,
             }),
             TypeFact::Object(owner) => {
-                if self.symbol(owner)?.declaration.kind == DeclarationKind::Module
-                    && self.expression_symbol(key, depth + 1) != Some(owner)
+                if self.symbol(*owner)?.declaration.kind == DeclarationKind::Module
+                    && self.expression_symbol(key, depth + 1) != Some(*owner)
                 {
                     return None;
                 }
-                self.nominal_builtin_receiver(owner)
+                self.nominal_builtin_receiver(*owner)
             }
             TypeFact::Nullable(_) | TypeFact::Written { .. } | TypeFact::Instance(_) => None,
         }
