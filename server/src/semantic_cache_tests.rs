@@ -9,7 +9,7 @@ fn reuses_index_when_disk_changes_without_an_accepted_refresh() {
     let root = directory.path().canonicalize().unwrap();
     std::fs::write(root.join("iris.toml"), "manifest_version = 1\npackage_id = \"org.example.cache\"\napi_major = 1\nversion = \"1.0.0\"\niris_major = 1\nsources = [\"main.iris\"]\nentry_modules = []\n[permissions]\nrequired = []\noptional = []\n").unwrap();
     let path = root.join("main.iris");
-    std::fs::write(&path, "module Main { let local = 1; local }").unwrap();
+    std::fs::write(&path, "module Main { fun run() { let local = 1; local } }").unwrap();
     let uri: Uri = url::Url::from_file_path(&path)
         .unwrap()
         .as_str()
@@ -27,7 +27,7 @@ fn reuses_index_when_disk_changes_without_an_accepted_refresh() {
     });
     let query = Query {
         uri,
-        operation: Operation::Definition(Position::new(0, 30)),
+        operation: Operation::Definition(Position::new(0, 42)),
     };
     let job = Job {
         ticket: Ticket(1),
@@ -40,7 +40,7 @@ fn reuses_index_when_disk_changes_without_an_accepted_refresh() {
     let mut cache = None;
     let initial = execute(&job, (&mut workspace, &mut roots, &mut cache), &[]).unwrap();
     assert_eq!(initial.as_array().unwrap().len(), 1);
-    std::fs::write(path, "module Main { let other = 1; other }").unwrap();
+    std::fs::write(path, "module Main { fun run() { let other = 1; other } }").unwrap();
     let when = execute(&job, (&mut workspace, &mut roots, &mut cache), &[]).unwrap();
     assert_eq!(when, initial);
     assert_eq!(

@@ -132,7 +132,7 @@ fn resolves_package_when_real_workspace_is_loaded_by_worker() {
     std::fs::write(root.join("iris.toml"), "manifest_version = 1\npackage_id = \"org.example.semantic\"\napi_major = 1\nversion = \"1.0.0\"\niris_major = 1\nsources = [\"main.iris\", \"types.iris\"]\nentry_modules = []\n[permissions]\nrequired = []\noptional = []\n").unwrap();
     std::fs::write(
         root.join("main.iris"),
-        "module Main { let item = Box.new() }",
+        "module Main { fun run() { let item = Box.new() } }",
     )
     .unwrap();
     std::fs::write(root.join("types.iris"), "class Box {}").unwrap();
@@ -161,7 +161,7 @@ fn resolves_package_when_real_workspace_is_loaded_by_worker() {
     ));
     let query = Query {
         uri: source_uri,
-        operation: crate::semantic_query::Operation::Definition(lsp_types::Position::new(0, 25)),
+        operation: crate::semantic_query::Operation::Definition(lsp_types::Position::new(0, 37)),
     };
     let when = query.execute((&snapshot, &analysis), &[]).unwrap();
     assert_eq!(when.as_array().unwrap().len(), 1, "{when:?}");

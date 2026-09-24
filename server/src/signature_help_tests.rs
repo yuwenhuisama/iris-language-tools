@@ -136,7 +136,7 @@ fn suppresses_help_when_unselected_candidate_would_inherit_false_highlight() {
 
 #[test]
 fn renders_filtered_shapes_when_real_analysis_maps_keywords() {
-    let text = "module Main { JSON.decode(value, depth: 2) }";
+    let text = "module Main { fun run() { JSON.decode(value, depth: 2) } }";
     let given = iris_analysis::AnalysisSnapshot::new([iris_analysis::SourceInput {
         id: iris_analysis::FileId(1),
         group: iris_analysis::GroupId(1),
@@ -164,7 +164,7 @@ fn renders_filtered_shapes_when_real_analysis_maps_keywords() {
 
 #[test]
 fn suppresses_help_when_real_trailing_block_leaves_no_parenthesized_slot() {
-    let text = "module Main { using(resource,) { ||; 1 } }";
+    let text = "module Main { fun run() { using(resource,) { ||; 1 } } }";
     let given = iris_analysis::AnalysisSnapshot::new([iris_analysis::SourceInput {
         id: iris_analysis::FileId(1),
         group: iris_analysis::GroupId(1),
