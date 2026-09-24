@@ -21,13 +21,18 @@ fn retains_only_compatible_shapes_when_arguments_identify_channels() {
         ("(1 ..= 3).by(step: ^2)", 1, 0, ParameterCategory::Keyword),
         ("(1 ..= 3).by(^2)", 1, 0, ParameterCategory::Positional),
         (
-            "[1].reduce(0, ^callback)",
+            "%[1].reduce(0, ^callback)",
             2,
             1,
             ParameterCategory::Positional,
         ),
-        ("[1].reduce(^callback)", 1, 0, ParameterCategory::Positional),
-        ("[1].count(^callback)", 1, 0, ParameterCategory::Positional),
+        (
+            "%[1].reduce(^callback)",
+            1,
+            0,
+            ParameterCategory::Positional,
+        ),
+        ("%[1].count(^callback)", 1, 0, ParameterCategory::Positional),
         (
             "JSON.encode(value, canonical: ^true)",
             2,
@@ -47,7 +52,7 @@ fn retains_only_compatible_shapes_when_arguments_identify_channels() {
             ParameterCategory::Positional,
         ),
     ] {
-        let given = format!("module Main {{ {call} }}");
+        let given = format!("module Main {{ fun use() {{ {call} }} }}");
 
         let when = help(&given).unwrap();
 
@@ -67,16 +72,16 @@ fn rejects_shapes_when_any_argument_is_incompatible_even_after_cursor() {
         "JSON.encode(^value, canonical: true, canonical: false)",
         "(1 ..= 3).by(^1, step: 2)",
         "(1 ..= 3).by(step: ^1, step: 2)",
-        "[1].reduce(^1, 2, 3)",
-        "[1].count(^1, 2)",
+        "%[1].reduce(^1, 2, 3)",
+        "%[1].count(^1, 2)",
         "using(^resource, callback) { ||; 1 }",
         "JSON.decode(arg1: ^value)",
-        "[1].count(callback: ^value)",
+        "%[1].count(callback: ^value)",
         "print(arg1: ^value)",
         "JSON.decode(value, limits: ^2)",
         "JSON.decode(value, ^2)",
     ] {
-        let given = format!("module Main {{ {call} }}");
+        let given = format!("module Main {{ fun use() {{ {call} }} }}");
 
         let when = help(&given);
 
@@ -87,14 +92,14 @@ fn rejects_shapes_when_any_argument_is_incompatible_even_after_cursor() {
 #[test]
 fn retains_plausible_alternatives_when_call_is_incomplete() {
     for (call, lengths) in [
-        ("[1].reduce(^", vec![1, 2]),
-        ("[1].reduce(callback^", vec![1, 2]),
-        ("[1].count(^", vec![0, 1]),
+        ("%[1].reduce(^", vec![1, 2]),
+        ("%[1].reduce(callback^", vec![1, 2]),
+        ("%[1].count(^", vec![0, 1]),
         ("(1 ..= 3).by(^", vec![1, 1]),
         ("JSON.encode(^", vec![1, 2]),
         ("using(resource^", vec![2, 2]),
     ] {
-        let given = format!("module Main {{ {call}");
+        let given = format!("module Main {{ fun use() {{ {call}");
 
         let when = help(&given).unwrap();
 
@@ -113,12 +118,12 @@ fn retains_plausible_alternatives_when_call_is_incomplete() {
 #[test]
 fn rejects_missing_required_slots_when_call_is_complete() {
     for call in [
-        "[1].reduce(^)",
+        "%[1].reduce(^)",
         "(1 ..= 3).by(^)",
         "using(resource^)",
         "JSON.decode(^)",
     ] {
-        let given = format!("module Main {{ {call} }}");
+        let given = format!("module Main {{ fun use() {{ {call} }} }}");
 
         let when = help(&given);
 
@@ -132,9 +137,9 @@ fn accepts_zero_or_repeated_arguments_when_rest_is_optional() {
         ("print(^)", Some(0)),
         ("print(^", Some(0)),
         ("print(1, 2, ^3)", Some(0)),
-        ("[1].count(^)", None),
+        ("%[1].count(^)", None),
     ] {
-        let given = format!("module Main {{ {call}");
+        let given = format!("module Main {{ fun use() {{ {call}");
 
         let when = help(&given).unwrap();
 
@@ -145,7 +150,7 @@ fn accepts_zero_or_repeated_arguments_when_rest_is_optional() {
 
 #[test]
 fn selects_keyword_shape_when_next_incomplete_slot_can_only_be_keyword() {
-    let given = "module Main { JSON.decode(value, ^";
+    let given = "module Main { fun use() { JSON.decode(value, ^";
 
     let when = help(given).unwrap();
 
@@ -159,7 +164,7 @@ fn selects_keyword_shape_when_next_incomplete_slot_can_only_be_keyword() {
 
 #[test]
 fn maps_next_slot_when_trailing_comma_precedes_existing_closer() {
-    let given = "module Main { 'abc'.replace('a', ^) }";
+    let given = "module Main { fun use() { 'abc'.replace('a', ^) } }";
 
     let when = help(given).unwrap();
 
@@ -169,7 +174,7 @@ fn maps_next_slot_when_trailing_comma_precedes_existing_closer() {
 
 #[test]
 fn rejects_excess_pending_argument_when_cursor_precedes_it() {
-    let given = "module Main { [1].count(^callback, ";
+    let given = "module Main { fun use() { %[1].count(^callback, ";
 
     let when = help(given);
 
@@ -178,7 +183,7 @@ fn rejects_excess_pending_argument_when_cursor_precedes_it() {
 
 #[test]
 fn maps_external_block_when_parser_records_it_outside_parentheses() {
-    let given = "module Main { using(resource,) { ||; 1 } }";
+    let given = "module Main { fun use() { using(resource,) { ||; 1 } } }";
 
     let when = iris_parser::parse_editor(given);
 
@@ -194,7 +199,7 @@ fn maps_external_block_when_parser_records_it_outside_parentheses() {
 
 #[test]
 fn selects_block_channel_without_highlighting_it_inside_parentheses() {
-    let given = "module Main { using(resource,^ ) { ||; 1 } }";
+    let given = "module Main { fun use() { using(resource,^ ) { ||; 1 } } }";
 
     let when = help(given).unwrap();
 
@@ -208,7 +213,7 @@ fn selects_block_channel_without_highlighting_it_inside_parentheses() {
 
 #[test]
 fn maps_resource_when_external_block_follows_cursor() {
-    let given = "module Main { using(^resource) { ||; 1 } }";
+    let given = "module Main { fun use() { using(^resource) { ||; 1 } } }";
 
     let when = help(given).unwrap();
 
@@ -223,10 +228,10 @@ fn maps_resource_when_external_block_follows_cursor() {
 #[test]
 fn avoids_callback_highlight_when_external_block_fills_positional_callback() {
     for call in [
-        "[1].map(^) { |value|; value }",
-        "[1].reduce(0,^ ) { |left, right|; left }",
+        "%[1].map(^) { |value|; value }",
+        "%[1].reduce(0,^ ) { |left, right|; left }",
     ] {
-        let given = format!("module Main {{ {call} }}");
+        let given = format!("module Main {{ fun use() {{ {call} }} }}");
 
         let when = help(&given).unwrap();
 
@@ -238,7 +243,7 @@ fn avoids_callback_highlight_when_external_block_fills_positional_callback() {
 #[test]
 fn preserves_backend_shapes_when_argument_types_differ() {
     for argument in ["1", "1.0", "value"] {
-        let given = format!("module Main {{ Float64(^{argument}) }}");
+        let given = format!("module Main {{ fun use() {{ Float64(^{argument}) }} }}");
 
         let when = help(&given).unwrap();
 

@@ -13,7 +13,7 @@ fn completion_when_receiver_has_proven_builtin_identity() {
     for (setup, receiver, expected) in [
         ("", "'abc'", "replace"),
         ("let text = 'abc';", "text", "trim"),
-        ("", "[1, 2]", "push"),
+        ("", "%[1, 2]", "push"),
         ("", "(1, 2)", "to_array"),
         ("", "%{1: 2}", "fetch"),
         ("", "(1 ..= 3)", "by"),
@@ -25,7 +25,7 @@ fn completion_when_receiver_has_proven_builtin_identity() {
         ("", "'abc'.split(',')", "push"),
         ("let callback = { |value|; value };", "callback", "call"),
     ] {
-        let text = format!("module Main {{ {setup} {receiver}.");
+        let text = format!("module Main {{ fun use() {{ {setup} {receiver}.");
         let given = snapshot(&text);
         let when = given.completions(FileId(1), text.len());
         assert!(
@@ -45,7 +45,7 @@ fn class_only_property_is_absent_when_receiver_is_float_instance() {
 
 #[test]
 fn hover_when_builtin_selector_has_real_occurrence() {
-    let text = "module Main { 'abc'.replace('a', 'b') }";
+    let text = "module Main { fun use() { 'abc'.replace('a', 'b') } }";
     let given = snapshot(text);
     let byte = text.find("replace").unwrap();
     let when = given.hover(FileId(1), byte).unwrap();
@@ -58,7 +58,7 @@ fn hover_when_builtin_selector_has_real_occurrence() {
 
 #[test]
 fn hover_return_evidence_is_not_a_declared_annotation_when_target_is_builtin() {
-    let text = "module Main { 'abc'.replace('a', 'b') }";
+    let text = "module Main { fun use() { 'abc'.replace('a', 'b') } }";
     let given = snapshot(text);
 
     let when = given
@@ -72,7 +72,7 @@ fn hover_return_evidence_is_not_a_declared_annotation_when_target_is_builtin() {
 
 #[test]
 fn signature_when_builtin_has_known_positional_shape() {
-    let text = "module Main { 'abc'.replace('a', ";
+    let text = "module Main { fun use() { 'abc'.replace('a', ";
     let given = snapshot(text);
     let when = given.signature_help(FileId(1), text.len()).unwrap();
     assert_eq!(
@@ -88,7 +88,7 @@ fn completion_is_absent_when_identity_is_unknown_or_name_is_shadowed() {
         ("let text: Dynamic<String> = 'abc';", "text"),
         ("mut text = 'abc';", "text"),
         ("let alias = JSON;", "alias"),
-        ("", "[1].first()"),
+        ("", "%[1].first()"),
         ("", "'abc'.replace"),
         ("", "Iteration.done()"),
     ] {
@@ -102,8 +102,9 @@ fn completion_is_absent_when_identity_is_unknown_or_name_is_shadowed() {
 #[test]
 fn literal_identity_is_independent_when_source_class_has_same_name() {
     for (receiver, expected) in [("'abc'", true), ("text", false)] {
-        let text =
-            format!("class String {{}} module Main {{ let text: String = 'abc'; {receiver}.rep");
+        let text = format!(
+            "class String {{}} module Main {{ fun use() {{ let text: String = 'abc'; {receiver}.rep"
+        );
         let given = snapshot(&text);
         let when = given.completions(FileId(1), text.len());
         assert_eq!(
