@@ -40,12 +40,12 @@ exports.verifyFormatting = async function () {
     await config.update('insertSpaces', true, vscode.ConfigurationTarget.Global, true);
     editor.options = { tabSize: 2, insertSpaces: true };
     assert.equal(saved.eol, vscode.EndOfLine.CRLF);
-    await editor.edit(builder => builder.replace(new vscode.Range(saved.positionAt(0), saved.positionAt(saved.getText().length)), 'class C {\nlet x = 1\n}'));
+    await editor.edit(builder => builder.replace(new vscode.Range(saved.positionAt(0), saved.positionAt(saved.getText().length)), 'class C {\n  public fun run() {\nlet x = 1\n}\n}'));
     assert.equal(await saved.save(), true);
-    assert.equal(await fs.readFile(file, 'utf8'), 'class C {\n  let x = 1\n}\n');
+    assert.equal(await fs.readFile(file, 'utf8'), 'class C {\n  public fun run() {\n    let x = 1\n  }\n}\n');
     assert.equal(saved.isDirty, false);
 
-    const incomplete = 'class C {\nlet x = 1';
+    const incomplete = 'class C {\n  public fun run() {\nlet x = 1';
     await editor.edit(builder => builder.replace(new vscode.Range(saved.positionAt(0), saved.positionAt(saved.getText().length)), incomplete));
     assert.equal(await saved.save(), true);
     assert.equal(await fs.readFile(file, 'utf8'), incomplete, 'Unclosed delimiters must not be changed on save');

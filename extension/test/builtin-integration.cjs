@@ -32,15 +32,15 @@ exports.verifyBuiltins = async function () {
         ['', "'abc'"],
         ["let text = 'abc'; ", 'text'],
       ]) {
-        const source = `module Main { ${setup}${receiver}.`;
+        const source = `module Main { fun use() { ${setup}${receiver}. } }`;
         await replace(editor, source);
         await eventually(`${suffix} String completion when receiver is ${receiver}`, () => assertCompletion(
-          document, document.positionAt(source.length), { present: ['replace', 'trim'], absent: ['push'] },
+          document, document.positionAt(source.length - 4), { present: ['replace', 'trim'], absent: ['push'] },
         ));
       }
       console.log(`PASS: ${suffix} untitled native provider acceptance: literal and binding String completion includes replace/trim, excludes push`);
 
-      const call = "module Main {\r\n '\u{1f600}'.replace('a', 'b')\r\n}";
+      const call = "module Main {\r\n fun use() { '\u{1f600}'.replace('a', 'b') }\r\n}";
       await replace(editor, call);
       await eventually(`${suffix} builtin Hover when querying replace after a UTF-16 surrogate pair`, () => assertHover(
         document, range(call, 'replace'), [/\breplace\s*\(/, /\bString\b/],
@@ -54,20 +54,20 @@ exports.verifyBuiltins = async function () {
       console.log(`PASS: ${suffix} untitled native provider acceptance: replace Hover has String and exact UTF-16 name range; SignatureHelp selects slot 2`);
 
       for (const [receiver, present, absent] of [
-        ['[1, 2]', ['length', 'push'], ['size', 'share_count', 'replace']],
+        ['%[1, 2]', ['length', 'push'], ['size', 'share_count', 'replace']],
         ['Float64', ['from_bits'], ['to_bits']],
         ['(1.0)', ['to_bits'], ['from_bits']],
       ]) {
-        const source = `module Main { ${receiver}.`;
+        const source = `module Main { fun use() { ${receiver}. } }`;
         await replace(editor, source);
         await eventually(`${suffix} builtin completion when receiver is ${receiver}`, () => assertCompletion(
-          document, document.positionAt(source.length), { present, absent },
+          document, document.positionAt(source.length - 4), { present, absent },
         ));
       }
       console.log(`PASS: ${suffix} untitled native provider acceptance: Array excludes size/share_count; Float64 class and literal methods stay distinct`);
 
       const local = 'class String { public fun source_only() {} public fun replace(value: Integer) -> Integer { value } }\n'
-        + 'module Main { let text: String = String.new(); text.replace(1) }';
+        + 'module Main { fun use() { let text: String = String.new(); text.replace(1) } }';
       await replace(editor, local);
       const localName = local.lastIndexOf('replace');
       await eventually(`${suffix} source methods when a local class is named String`, async () => {
@@ -82,7 +82,7 @@ exports.verifyBuiltins = async function () {
         });
         assert.equal(help.signatures[0].parameters.length, 1);
       });
-      const shadowedLiteral = local.slice(0, local.indexOf('module Main')) + "module Main { 'abc'.";
+      const shadowedLiteral = local.slice(0, local.indexOf('module Main')) + "module Main { fun use() { 'abc'.";
       await replace(editor, shadowedLiteral);
       await eventually(`${suffix} literal identity when source declares a String class`, () => assertCompletion(
         document, document.positionAt(shadowedLiteral.length), {
@@ -91,7 +91,7 @@ exports.verifyBuiltins = async function () {
       ));
       console.log(`PASS: ${suffix} untitled native provider acceptance: local String methods retain source completion/Hover/signature; literals retain builtin identity`);
 
-      const dynamic = "module Main { 'abc'.replace('a', 'b'); let text: Dynamic<String> = 'abc'; text.replace('a', 'b') }";
+      const dynamic = "module Main { fun use() { 'abc'.replace('a', 'b'); let text: Dynamic<String> = 'abc'; text.replace('a', 'b') } }";
       await replace(editor, dynamic);
       const dynamicName = dynamic.lastIndexOf('replace');
       await eventually(`${suffix} empty builtin results when binding is annotated Dynamic<String>`, async () => {
@@ -108,15 +108,15 @@ exports.verifyBuiltins = async function () {
       });
       console.log(`PASS: ${suffix} untitled native provider acceptance: Dynamic<String> has no method completion, Hover or SignatureHelp; editor word suggestions are independent`);
 
-      const original = "module Main { let text = 'abc'; text.";
+      const original = "module Main { fun use() { let text = 'abc'; text. } }";
       await replace(editor, original);
       await eventually(`${suffix} String methods before an unsaved receiver edit`, () => assertCompletion(
-        document, document.positionAt(original.length), { present: ['replace', 'trim'], absent: ['push'] },
+        document, document.positionAt(original.length - 4), { present: ['replace', 'trim'], absent: ['push'] },
       ));
       const version = document.version;
-      assert.equal(await editor.edit(edit => edit.replace(range(original, "'abc'"), '[1, 2]')), true);
+      assert.equal(await editor.edit(edit => edit.replace(range(original, "'abc'"), '%[1, 2]')), true);
       await eventually(`${suffix} Array methods when the same binding initializer changes unsaved`, () => assertCompletion(
-        document, document.positionAt(document.getText().length), {
+        document, document.positionAt(document.getText().length - 4), {
           present: ['length', 'push'], absent: ['replace', 'trim', 'size', 'share_count'],
         },
       ));
@@ -124,14 +124,14 @@ exports.verifyBuiltins = async function () {
       assert.equal(document.isDirty, true);
       console.log(`PASS: ${suffix} untitled native provider acceptance: unsaved String-to-Array receiver edit updates methods (no physical typing or widget-pixel claim)`);
 
-      const classCopy = 'module Main { let klass = Float64; klass.';
+      const classCopy = 'module Main { fun use() { let klass = Float64; klass. } }';
       await replace(editor, classCopy);
       await eventually(`${suffix} class identity survives an immutable copy`, () => assertCompletion(
-        document, document.positionAt(classCopy.length), {
+        document, document.positionAt(classCopy.length - 4), {
           present: ['from_bits', 'define_method'], absent: ['to_bits'],
         },
       ));
-      const methodReads = 'module Main { Object.new().hash().div(1); Object.new().hash.div(1) }';
+      const methodReads = 'module Main { fun use() { Object.new().hash().div(1); Object.new().hash.div(1) } }';
       await replace(editor, methodReads);
       await eventually(`${suffix} Object method reads are not invocation results`, async () => {
         await assertSignature(document, position(methodReads, methodReads.indexOf('div(1)') + 4), {
@@ -144,7 +144,7 @@ exports.verifyBuiltins = async function () {
       });
       console.log(`PASS: ${suffix} class-value copies retain metadata; Object method reads do not acquire return-type signatures`);
 
-      const indexed = 'let a = "ffff".split(""); let b = a[0]; b';
+      const indexed = 'module Main { fun use() { let a = "ffff".split(""); let b = a[0]; b } }';
       await replace(editor, indexed);
       await eventually(`${suffix} split element type reaches indexed binding Hover and inlay hints`, async () => {
         await assertHover(document, range(indexed, 'a', indexed.indexOf('a =')), [/Array<String>/]);
